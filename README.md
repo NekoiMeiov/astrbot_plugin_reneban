@@ -9,7 +9,7 @@ _🚫 为 [astrbot](https://github.com/AstrBotDevs/AstrBot) 设计的简易黑�
 
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 <br>
-[![AstrBot](https://img.shields.io/badge/AstrBot-yellow.svg)](https://github.com/Soulter/AstrBot)
+[![AstrBot](https://img.shields.io/badge/AstrBot-yellow.svg)](https://github.com/AstrBotDevs/AstrBot)
 <br>
 [![GitHub](https://img.shields.io/badge/NekoiMeiov__Team-orange.svg?style=for-the-badge)](https://github.com/NekoiMeiov)
 
