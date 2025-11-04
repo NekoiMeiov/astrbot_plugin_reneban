@@ -51,13 +51,18 @@ ReNeBan 的指令优先级策略为：`pass > ban`，`会话 > 全局`。
 
 ## 安装
 - 从插件市场安装
+
 在 插件管理 - 插件市场 搜索 ReNeBan
+
 - 从链接安装
+
 在 插件管理 - 安装 - 从链接安装 输入以下链接
 ``` text
 https://github.com/NekoiMeiov/astrbot_plugin_reneban
 ```
+
 - 从源码安装
+
 在终端中输入以下命令（若为手动安装，请将 /AstrBot 修改为手动安装的路径）
 ```bash
 # 克隆仓库到插件目录
