@@ -1,10 +1,7 @@
 # pass > pass-all > ban-all > ban
 """
     ToDo:
-    decpass 命令
-    decpass-all 命令
-    no_reason -> 无理由
-    clear_expired_banned() review
+    clear banned reviews
     ...
 """
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
@@ -36,7 +33,6 @@ class ReNeBan(Star):
             path.touch(exist_ok=True)
             if path.stat().st_size == 0:
                 path.write_text('{}', encoding='utf-8')
-
         for path in [
             self.banall_list_path,
             self.passall_list_path,
@@ -45,10 +41,12 @@ class ReNeBan(Star):
             if path.stat().st_size == 0:
                 path.write_text('[]', encoding='utf-8')
 
+        # 无理由判断list
         self.no_reason = [
             "无理由",
             "None",
             "NULL"
+        # command语法
         ]
         self.commands = {
             "ban": "/ban <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
@@ -60,7 +58,7 @@ class ReNeBan(Star):
             "banlist": "/banlist",
             "ban-help": "/ban-help"
         }
-        # 用户输出文案
+        # 输出文案
         self.messages = {
             "command_error": "语法错误，{command} 的语法应为 {commands_text}",
             "time_zeroset_error": "{command} 已被设置永久时限，不支持叠加操作",
@@ -76,6 +74,7 @@ class ReNeBan(Star):
             "no_global_banned": "\n全局没有禁用用户",
             "group_passed_list": "本群临时解限用户：",
             "no_group_passed": "\n本群没有临时解限用户呢！",
+            "no_reason": "无理由",
             "global_passed_list": "全局临时解限用户：",
             "no_global_passed": "\n全局没有临时解限用户",
             "banlist_strlist_format": "\n - {user} - {time} - {reason}",
@@ -151,6 +150,32 @@ class ReNeBan(Star):
         self.passall_list_path.write_text(json.dumps(passall_data, indent=4, ensure_ascii=False), encoding="utf-8")
         return
 
+    def clear_redundant_banned(self):
+        """
+        清除多余的禁用列表。
+        Ver None
+        """
+        pass
+        # # load ban-all
+        # banall_rawdata = self.banall_list_path.read_text(encoding="utf-8")
+        # banall_data = json.loads(banall_rawdata) # type: list[dict]
+        # # load pass-all
+        # passall_rawdata = self.passall_list_path.read_text(encoding="utf-8")
+        # passall_data = json.loads(passall_rawdata) # type: list[dict]
+        # # load ban
+        # ban_rawdata = self.banlist_path.read_text(encoding="utf-8")
+        # ban_data = json.loads(ban_rawdata) # type: dict
+        # # load pass
+        # pass_rawdata = self.passlist_path.read_text(encoding="utf-8")
+        # pass_data = json.loads(pass_rawdata) # type: dict
+
+    def clear_banned(self):
+        """
+        清除禁用列表。
+        Ver PoC_0.1.0
+        """
+        self.clear_expired_banned()
+        self.clear_redundant_banned()
 
     def is_banned(self, event: AstrMessageEvent) -> tuple[bool, str | None]:
         """
@@ -160,7 +185,7 @@ class ReNeBan(Star):
         if not self.enable:
             return (False, None)
         # pass > pass-all > ban-all > ban
-        self.clear_expired_banned()
+        self.clear_banned()
         # 获取UMO
         umo = event.unified_msg_origin
         # pass
@@ -200,120 +225,6 @@ class ReNeBan(Star):
             if item.get('uid') == event.get_sender_id():
                 return (True, item.get('reason'))
         return (False, None)
-
-    @filter.command("banlist")
-    async def banlist(self, event: AstrMessageEvent):
-        """
-        显示当前群禁用名单
-        """
-        # 禁用功能未启用
-        if not self.enable:
-            group_banned_text = self.messages["group_banned_list"] + self.messages["no_group_banned"]
-            global_banned_text = self.messages["global_banned_list"] + self.messages["no_global_banned"]
-            group_passed_text = self.messages["group_passed_list"] + self.messages["no_group_passed"]
-            global_passed_text = self.messages["global_passed_list"] + self.messages["no_global_passed"]
-            result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
-            yield event.plain_result(result)
-            return
-        self.clear_expired_banned()
-        # 获取UMO
-        umo = event.unified_msg_origin
-        # get_pass
-        tmpdata = self.passlist_path.read_text(encoding='utf-8')
-        passlist = json.loads(tmpdata)
-        group_passed_list = passlist.get(umo) if isinstance(passlist.get(umo), list) else []
-        # get_pass-all
-        tmpdata = self.passall_list_path.read_text(encoding='utf-8')
-        global_passed_list = json.loads(tmpdata)
-        # get_ban-all
-        tmpdata = self.banall_list_path.read_text(encoding='utf-8')
-        global_banned_list = json.loads(tmpdata)
-        # get_ban
-        tmpdata = self.banlist_path.read_text(encoding='utf-8')
-        banlist = json.loads(tmpdata)
-        group_banned_list = banlist.get(umo) if isinstance(banlist.get(umo), list) else []
-        # group_banned_list
-        # group_banned_list = []
-        # for item in umo_ban_list:
-        #     if item.get('time') == 0 or item.get('time') > int(time_module.time()):
-        #         group_banned_list.append(item)
-        # global_banned_list
-        # global_banned_list = []
-        # for item in banall_list:
-        #     if item.get('time') == 0 or item.get('time') > int(time_module.time()):
-        #         global_banned_list.append(item)
-        # group_passed_list
-        # group_passed_list = []
-        # for item in umo_pass_list:
-        #     if item.get('time') == 0 or item.get('time') > int(time_module.time()):
-        #         group_passed_list.append(item)
-        # global_passed_list
-        # global_passed_list = []
-        # for item in passall_list:
-        #     if item.get('time') == 0 or item.get('time') > int(time_module.time()):
-        #         global_passed_list.append(item)
-        group_banned_str_list = [
-            # f"\n{item.get('uid')} - {self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0)} - {item.get('reason')}"
-            self.messages["banlist_strlist_format"].format(
-                user=item.get('uid'),
-                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
-                reason=item.get('reason')
-            )
-            for item in group_banned_list
-        ]
-        if not group_banned_str_list:
-            group_banned_str_list.append(self.messages["no_group_banned"])
-        global_banned_str_list = [
-            # f"\n{item.get('uid')} - {self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0)} - {item.get('reason')}"
-            self.messages["banlist_strlist_format"].format(
-                user=item.get('uid'),
-                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
-                reason=item.get('reason')
-            )
-            for item in global_banned_list
-        ]
-        if not global_banned_str_list:
-            global_banned_str_list.append(self.messages["no_global_banned"])
-        group_passed_str_list = [
-            # f"\n{item.get('uid')} - {self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0)} - {item.get('reason')}"
-            self.messages["banlist_strlist_format"].format(
-                user=item.get('uid'),
-                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
-                reason=item.get('reason')
-            )
-            for item in group_passed_list
-        ]
-        if not group_passed_str_list:
-            group_passed_str_list.append(self.messages["no_group_passed"])
-        global_passed_str_list = [
-            # f"\n{item.get('uid')} - {self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0)} - {item.get('reason')}"
-            self.messages["banlist_strlist_format"].format(
-                user=item.get('uid'),
-                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
-                reason=item.get('reason')
-            )
-            for item in global_passed_list
-        ]
-        if not global_passed_str_list:
-            global_passed_str_list.append(self.messages["no_global_passed"])
-
-        group_banned_text = self.messages["group_banned_list"] + "".join(group_banned_str_list)
-        global_banned_text = self.messages["global_banned_list"] + "".join(global_banned_str_list)
-        group_passed_text = self.messages["group_passed_list"] + "".join(group_passed_str_list)
-        global_passed_text = self.messages["global_passed_list"] + "".join(global_passed_str_list)
-
-        result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
-        yield event.plain_result(result)
-    # def time_format(self, time_stamp: int) -> str:
-    #     """
-    #     将时间戳格式化为易读的日期时间字符串
-    #     """
-    #     if time_stamp == 0:
-    #         return "永久"
-        
-    #     import datetime
-    #     dt = datetime.datetime.fromtimestamp(time_stamp)
-    #     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     def timelast_format(self, time_last: int) -> str:
         """
@@ -405,6 +316,95 @@ class ReNeBan(Star):
 
         # 返回第一个（也是唯一一个）At 用户，如果没有则返回 None
         return at_users[0] if at_users else None
+    @filter.command("banlist")
+    async def banlist(self, event: AstrMessageEvent):
+        """
+        显示当前群禁用名单
+        """
+        # 禁用功能未启用
+        if not self.enable:
+            group_banned_text = self.messages["group_banned_list"] + self.messages["no_group_banned"]
+            global_banned_text = self.messages["global_banned_list"] + self.messages["no_global_banned"]
+            group_passed_text = self.messages["group_passed_list"] + self.messages["no_group_passed"]
+            global_passed_text = self.messages["global_passed_list"] + self.messages["no_global_passed"]
+            result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
+            yield event.plain_result(result)
+            return
+        self.clear_banned()
+        # 获取UMO
+        umo = event.unified_msg_origin
+        # get_pass
+        tmpdata = self.passlist_path.read_text(encoding='utf-8')
+        passlist = json.loads(tmpdata)
+        group_passed_list = passlist.get(umo) if isinstance(passlist.get(umo), list) else []
+        # get_pass-all
+        tmpdata = self.passall_list_path.read_text(encoding='utf-8')
+        global_passed_list = json.loads(tmpdata)
+        # get_ban-all
+        tmpdata = self.banall_list_path.read_text(encoding='utf-8')
+        global_banned_list = json.loads(tmpdata)
+        # get_ban
+        tmpdata = self.banlist_path.read_text(encoding='utf-8')
+        banlist = json.loads(tmpdata)
+        group_banned_list = banlist.get(umo) if isinstance(banlist.get(umo), list) else []
+        group_banned_str_list = [
+            self.messages["banlist_strlist_format"].format(
+                user=item.get('uid'),
+                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
+                reason=item.get('reason') if item.get('reason') else self.messages["no_reason"]
+            )
+            for item in group_banned_list
+        ]
+        if not group_banned_str_list:
+            group_banned_str_list.append(self.messages["no_group_banned"])
+        global_banned_str_list = [
+            self.messages["banlist_strlist_format"].format(
+                user=item.get('uid'),
+                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
+                reason=item.get('reason') if item.get('reason') else self.messages["no_reason"]
+            )
+            for item in global_banned_list
+        ]
+        if not global_banned_str_list:
+            global_banned_str_list.append(self.messages["no_global_banned"])
+        group_passed_str_list = [
+            self.messages["banlist_strlist_format"].format(
+                user=item.get('uid'),
+                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
+                reason=item.get('reason') if item.get('reason') else self.messages["no_reason"]
+            )
+            for item in group_passed_list
+        ]
+        if not group_passed_str_list:
+            group_passed_str_list.append(self.messages["no_group_passed"])
+        global_passed_str_list = [
+            self.messages["banlist_strlist_format"].format(
+                user=item.get('uid'),
+                time=self.timelast_format((item.get('time')-int(time_module.time())) if item.get('time') != 0 else 0),
+                reason=item.get('reason') if item.get('reason') else self.messages["no_reason"]
+            )
+            for item in global_passed_list
+        ]
+        if not global_passed_str_list:
+            global_passed_str_list.append(self.messages["no_global_passed"])
+
+        group_banned_text = self.messages["group_banned_list"] + "".join(group_banned_str_list)
+        global_banned_text = self.messages["global_banned_list"] + "".join(global_banned_str_list)
+        group_passed_text = self.messages["group_passed_list"] + "".join(group_passed_str_list)
+        global_passed_text = self.messages["global_passed_list"] + "".join(global_passed_str_list)
+
+        result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
+        yield event.plain_result(result)
+    # def time_format(self, time_stamp: int) -> str:
+    #     """
+    #     将时间戳格式化为易读的日期时间字符串
+    #     """
+    #     if time_stamp == 0:
+    #         return "永久"
+        
+    #     import datetime
+    #     dt = datetime.datetime.fromtimestamp(time_stamp)
+    #     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban-enable")
@@ -464,7 +464,7 @@ class ReNeBan(Star):
             yield event.plain_result(self.messages["command_error"].format(command="ban",commands_text=self.commands["ban"]))
             return
         # 准备ban_user
-        self.clear_expired_banned()
+        self.clear_banned()
         tmpdata = self.banlist_path.read_text(encoding='utf-8')
         banlist = json.loads(tmpdata)
         if not isinstance(banlist.get(umo), list):
@@ -519,7 +519,7 @@ class ReNeBan(Star):
         except AtNumberError:
             yield event.plain_result(self.messages["command_error"].format(command="ban-all",commands_text=self.commands["ban-all"]))
             return
-        self.clear_expired_banned()
+        self.clear_banned()
         tmpdata = self.banall_list_path.read_text(encoding='utf-8')
         banall_list = json.loads(tmpdata)
         tempbool = False
@@ -574,7 +574,7 @@ class ReNeBan(Star):
         except AtNumberError:
             yield event.plain_result(self.messages["command_error"].format(command="pass",commands_text=self.commands["pass"]))
             return
-        self.clear_expired_banned()
+        self.clear_banned()
         tmpdata = self.passlist_path.read_text(encoding='utf-8')
         passlist = json.loads(tmpdata)
         if not isinstance(passlist.get(umo), list):
@@ -628,7 +628,7 @@ class ReNeBan(Star):
         except AtNumberError:
             yield event.plain_result(self.messages["command_error"].format(command="pass-all",commands_text=self.commands["pass-all"]))
             return
-        self.clear_expired_banned()
+        self.clear_banned()
         tmpdata = self.passall_list_path.read_text(encoding='utf-8')
         passall_list = json.loads(tmpdata)
         tempbool = False
