@@ -1,5 +1,5 @@
 ## 注意！
-ReNeBan 插件目前仅通过 PoC（概念验证），功能会持续迭代。若您在迭代期间需要取消一个时长被设定为永久的命令，请操作插件数据目录中的相应json文件。
+ReNeBan 插件目前仅通过 PoC（概念验证），功能会持续迭代。
 
 <div align="center">
 
@@ -18,7 +18,7 @@ _🚫 为 [astrbot](https://github.com/AstrBotDevs/AstrBot) 设计的简易黑�
 ## 介绍
 ReNeBan 是一个为 [astrbot](https://github.com/AstrBotDevs/AstrBot) 设计的简易黑名单插件，允许bot管理员在**会话**或**全局**范围较为灵活地禁用指定用户。
 ReNeBan 允许为**禁用/解禁**设置**时限**和**理由**，并自动整理记录。
-ReNeBan 的指令优先级策略为：`pass > ban`，`会话 > 全局`。
+ReNeBan 的指令优先级策略为：`会话 > 全局`，`pass > ban`。
 
 ## 命令
 | 命令 | 语法 | 说明 | 示例 |
@@ -31,6 +31,10 @@ ReNeBan 的指令优先级策略为：`pass > ban`，`会话 > 全局`。
 | `/ban-disable` | /ban-disable | 禁用禁用功能，重启后失效 | /ban-disable |
 | `/banlist` | /banlist | 输出在**当前会话**与**全局**范围下的**禁用/解禁**情况（包括**UID/剩余时长/理由**） | /banlist |
 | `/ban-help` | /ban-help | 输出简易帮助信息 | /ban-help |
+| `/dec-ban` | /dec-ban <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的禁用记录 | /dec-ban @UserA 0 表现良好 |
+| `/dec-pass` | /dec-pass <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的解禁记录 | /dec-pass @UserB 0 None |
+| `/dec-ban-all` | /dec-ban-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的禁用记录 | /dec-ban-all 3869541370 1d30m 表现良好 |
+| `/dec-pass-all` | /dec-pass-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的解禁记录 | /dec-pass-all @XYZ 0 NULL |
 
 时间字段支持如下格式：
 
@@ -38,7 +42,7 @@ ReNeBan 的指令优先级策略为：`pass > ban`，`会话 > 全局`。
 - `1d` → 1 天
 - `2h` → 2 小时
 - `30m` → 30 分钟
-- `10s` → 10 秒
+- `10s`，`10` → 10 秒
 - `0` → 永久（默认，且不支持与以上单位复用）
 ```
 
