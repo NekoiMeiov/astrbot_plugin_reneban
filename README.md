@@ -1,6 +1,3 @@
-## 注意！
-ReNeBan 插件目前仅通过 PoC（概念验证），功能会持续迭代。
-
 <div align="center">
 
 # ReNeBan
@@ -35,6 +32,7 @@ ReNeBan 的指令优先级策略为：`会话 > 全局`，`pass > ban`。
 | `/dec-pass` | /dec-pass <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的解禁记录 | /dec-pass @UserB 0 None |
 | `/dec-ban-all` | /dec-ban-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的禁用记录 | /dec-ban-all 3869541370 1d30m 表现良好 |
 | `/dec-pass-all` | /dec-pass-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的解禁记录 | /dec-pass-all @XYZ 0 NULL |
+| `/ban-reset` | /ban-reset <@用户\|UID（QQ号）> | 删除**一名指定用户**的**所有**记录 | /ban-reset @NekoiMeiov |
 
 时间字段支持如下格式：
 
