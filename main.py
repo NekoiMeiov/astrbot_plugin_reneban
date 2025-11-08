@@ -1,9 +1,4 @@
 # pass > ban > pass-all > ban-all
-"""
-Todo:
-    clear_redundant_banned()
-    ...
-"""
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, StarTools
 from astrbot.api import logger, AstrBotConfig
@@ -130,65 +125,118 @@ class ReNeBan(Star):
     def clear_expired_banned(self):
         """
         清除过期的禁用列表。
-        Ver PoC_0.1.0
+        Ver 0.1.1_MVP_AI
+        我操AI太好用了你们知道吗
         """
-        # clear_passlist
-        passlist_rawdata = self.passlist_path.read_text(encoding="utf-8")
-        passlist_data = json.loads(passlist_rawdata)
-        # 遍历umo
-        for umo, umo_list in passlist_data.items():
-            for umo_list_item in umo_list:
-                if umo_list_item.get('time') < int(time_module.time()) and umo_list_item.get('time') != 0:
-                    passlist_data[umo].remove(umo_list_item)
-        # 保存
-        self.passlist_path.write_text(json.dumps(passlist_data, indent=4, ensure_ascii=False), encoding="utf-8")
-        # clear_banlist
-        banlist_rawdata = self.banlist_path.read_text(encoding="utf-8")
-        banlist_data = json.loads(banlist_rawdata)
-        for umo, umo_list in banlist_data.items():
-            for umo_list_item in umo_list:
-                if umo_list_item.get('time') < int(time_module.time()) and umo_list_item.get('time') != 0:
-                    banlist_data[umo].remove(umo_list_item)
-        self.banlist_path.write_text(json.dumps(banlist_data, indent=4, ensure_ascii=False), encoding="utf-8")
-        # clear_banall_list
-        banall_rawdata = self.banall_list_path.read_text(encoding="utf-8")
-        banall_data = json.loads(banall_rawdata)
-        for item in banall_data:
-            if item.get('time') < int(time_module.time()) and item.get('time') != 0:
-                banall_data.remove(item)
-        self.banall_list_path.write_text(json.dumps(banall_data, indent=4, ensure_ascii=False), encoding="utf-8")
-        # clear_passall_list
-        passall_rawdata = self.passall_list_path.read_text(encoding="utf-8")
-        passall_data = json.loads(passall_rawdata)
-        for item in passall_data:
-            if item.get('time') < int(time_module.time()) and item.get('time') != 0:
-                passall_data.remove(item)
-        self.passall_list_path.write_text(json.dumps(passall_data, indent=4, ensure_ascii=False), encoding="utf-8")
-        return
-
+        current_time = int(time_module.time())
+        
+        # 处理所有列表的公共函数
+        def clear_expired_items(data, is_dict=False):
+            if is_dict:
+                # 字典结构：{umo: [items]}
+                for key in list(data.keys()):
+                    data[key] = [item for item in data[key] 
+                               if not (item.get('time', 0) < current_time and item.get('time', 0) != 0)]
+                    # 如果该umo下没有项目了，删除空键
+                    if not data[key]:
+                        del data[key]
+            else:
+                # 列表结构：[items]
+                data[:] = [item for item in data 
+                          if not (item.get('time', 0) < current_time and item.get('time', 0) != 0)]
+            return data
+        
+        # 统一处理所有列表
+        lists_to_clear = [
+            (self.passlist_path, True),    # passlist是字典结构
+            (self.banlist_path, True),     # banlist是字典结构  
+            (self.banall_list_path, False), # banall_list是列表结构
+            (self.passall_list_path, False) # passall_list是列表结构
+        ]
+        
+        for file_path, is_dict in lists_to_clear:
+            try:
+                raw_data = file_path.read_text(encoding="utf-8")
+                data = json.loads(raw_data)
+                cleared_data = clear_expired_items(data, is_dict)
+                file_path.write_text(json.dumps(cleared_data, indent=4, ensure_ascii=False), encoding="utf-8")
+            except Exception as e:
+                # 添加错误处理，避免一个文件出错影响其他文件
+                logger.error(f"清理文件 {file_path} 时出错: {e}")
+    
     def clear_redundant_banned(self):
         """
         清除冗余的禁用列表。
-        Ver None
+        Ver 0.1.0_MVP_AI
+        我操AI太好用了你们知道吗
         """
-        pass
-        # # load ban-all
-        # banall_rawdata = self.banall_list_path.read_text(encoding="utf-8")
-        # banall_data = json.loads(banall_rawdata) # type: list[dict]
-        # # load pass-all
-        # passall_rawdata = self.passall_list_path.read_text(encoding="utf-8")
-        # passall_data = json.loads(passall_rawdata) # type: list[dict]
-        # # load ban
-        # ban_rawdata = self.banlist_path.read_text(encoding="utf-8")
-        # ban_data = json.loads(ban_rawdata) # type: dict
-        # # load pass
-        # pass_rawdata = self.passlist_path.read_text(encoding="utf-8")
-        # pass_data = json.loads(pass_rawdata) # type: dict
-
+        # 加载所有数据
+        banall_data = json.loads(self.banall_list_path.read_text(encoding="utf-8"))
+        passall_data = json.loads(self.passall_list_path.read_text(encoding="utf-8"))
+        ban_data = json.loads(self.banlist_path.read_text(encoding="utf-8"))
+        pass_data = json.loads(self.passlist_path.read_text(encoding="utf-8"))
+        
+        # 处理ban_data中的冗余
+        for umo in list(ban_data.keys()):
+            if umo in pass_data:
+                pass_list = pass_data[umo]
+                ban_list = ban_data[umo]
+                
+                # 创建pass项的uid到time的映射
+                pass_time_map = {item['uid']: item.get('time', 0) for item in pass_list}
+                
+                # 过滤ban_list，保留那些没有对应pass项，或者pass项时间不更新的项
+                ban_data[umo] = [
+                    ban_item for ban_item in ban_list
+                    if ban_item['uid'] not in pass_time_map 
+                    or pass_time_map[ban_item['uid']] <= ban_item.get('time', 0)
+                ]
+                
+                # 如果该umo下没有ban项了，删除空键
+                if not ban_data[umo]:
+                    del ban_data[umo]
+        
+        # 处理banall_data中的冗余
+        passall_time_map = {item['uid']: item.get('time', 0) for item in passall_data}
+        
+        banall_data = [
+            ban_item for ban_item in banall_data
+            if ban_item['uid'] not in passall_time_map 
+            or passall_time_map[ban_item['uid']] <= ban_item.get('time', 0)
+        ]
+        
+        # 处理passall_data，只保留在banall_data中存在的uid
+        banall_uids = {item['uid'] for item in banall_data}
+        passall_data = [item for item in passall_data if item['uid'] in banall_uids]
+        
+        # 处理pass_data，只保留在ban_data或banall_data中存在的uid
+        combine_ban_uids = set()
+        # 收集所有ban_data中的uid
+        for umo_ban_list in ban_data.values():
+            combine_ban_uids.update(item['uid'] for item in umo_ban_list)
+        # 添加banall_data中的uid
+        combine_ban_uids.update(banall_uids)
+        
+        # 过滤pass_data
+        for umo in list(pass_data.keys()):
+            pass_data[umo] = [
+                item for item in pass_data[umo] 
+                if item['uid'] in combine_ban_uids
+            ]
+            # 如果该umo下没有pass项了，删除空键
+            if not pass_data[umo]:
+                del pass_data[umo]
+        
+        # 保存所有数据
+        self.banlist_path.write_text(json.dumps(ban_data, indent=4, ensure_ascii=False), encoding="utf-8")
+        self.passlist_path.write_text(json.dumps(pass_data, indent=4, ensure_ascii=False), encoding="utf-8")
+        self.banall_list_path.write_text(json.dumps(banall_data, indent=4, ensure_ascii=False), encoding="utf-8")
+        self.passall_list_path.write_text(json.dumps(passall_data, indent=4, ensure_ascii=False), encoding="utf-8")
+    
     def clear_banned(self):
         """
         清除禁用列表。
-        Ver PoC_0.1.0
+        Ver 0.1.0_MVP
         """
         self.clear_expired_banned()
         self.clear_redundant_banned()
