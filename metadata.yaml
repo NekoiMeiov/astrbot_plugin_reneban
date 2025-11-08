@@ -1,6 +1,6 @@
 name: astrbot_plugin_reneban
 display_name: ReNeBan（Ban黑名单插件）
-version: PoC
+version: MVP
 author: NekoiMeiov_Team
 description: 黑名单插件，用于禁用指定用户在会话或全局范围内使用机器人的插件。管理员可通过指令对用户进行禁用或解除禁用，ban-help查看简易帮助信息
 repo: https://github.com/NekoiMeiov/astrbot_plugin_reneban
