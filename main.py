@@ -84,7 +84,7 @@ class ReNeBan(Star):
             "global_passed_list": "全局临时解限用户：",
             "no_global_passed": "\n全局没有临时解限用户",
             "banlist_strlist_format": "\n - {user} - {time} - {reason}",
-            "ban_reset_success": "已清除用户 {reset_uid} 的所有记录。",
+            "ban_reset_success": "已清除用户 {user} 的所有记录。",
             "ban_enabled": "已临时启用禁用功能～重启后失效",
             "ban_disabled": "已临时禁用禁用功能～重启后失效",
             "help_text": f"""黑名单插件使用指南：
