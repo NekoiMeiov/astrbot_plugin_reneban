@@ -74,7 +74,6 @@ class ReNeBan(Star):
             "dec_passed_user_global": "已删除全局对 {user} 的临时解限（{time}），理由：{reason}",
             "dec_no_record": "未找到记录，可能是因为该用户的记录已过期，无需删除",
             "dec_zerotime_error": "无法删除，因为该用户的记录时限被设为永久，请设置删除时间为0以强制删除！",
-            "passed_all": "已解除对 {users} 的所有限制，理由：{reason}",
             "group_banned_list": "本群禁用的用户:",
             "no_group_banned": "\n本群没有禁用用户呢！",
             "global_banned_list": "全局禁用的用户:",
@@ -907,16 +906,11 @@ class ReNeBan(Star):
         self.passall_list_path.write_text(
             json.dumps(passall_list, indent=4, ensure_ascii=False), encoding="utf-8"
         )
-        if time == "0":
-            yield event.plain_result(
-                self.messages["passed_all"].format(user=pass_uid, reason=reason)
+        yield event.plain_result(
+            self.messages["passed_user_global"].format(
+                user=pass_uid, time=self.time_format(time), reason=reason
             )
-        else:
-            yield event.plain_result(
-                self.messages["passed_user_global"].format(
-                    user=pass_uid, time=self.time_format(time), reason=reason
-                )
-            )
+        )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-pass")
