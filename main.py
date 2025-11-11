@@ -1126,7 +1126,7 @@ class ReNeBan(Star):
         banlist = json.loads(tmpdata)
         group_banned_list = banlist.get(umo)
         if not isinstance(group_banned_list, list):
-            yield event.plain_result(self.messages["ban_no_record"])
+            yield event.plain_result(self.messages["dec_no_record"])
             return
         for item in group_banned_list:
             if item.get("uid") == ban_uid:
