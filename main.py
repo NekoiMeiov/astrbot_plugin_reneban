@@ -7,6 +7,8 @@ import json
 import time as time_module
 import re
 
+from . import strings
+
 
 class AtNumberError(ValueError):
     """
@@ -42,88 +44,9 @@ class ReNeBan(Star):
             if path.stat().st_size == 0:
                 path.write_text("[]", encoding="utf-8")
 
-        # 无理由判断list
-        self.no_reason = ["无理由", "None", "NULL"]
-        # command语法
-        self.commands = {
-            "ban": "/ban <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
-            "ban-all": "/ban-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-            "pass": "/pass <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
-            "pass-all": "/pass-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-            "ban-enable": "/ban-enable",
-            "ban-disable": "/ban-disable",
-            "banlist": "/banlist",
-            "ban-help": "/ban-help",
-            "dec-ban": "/dec-ban <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
-            "dec-pass": "/dec-pass <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
-            "dec-ban-all": "/dec-ban-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-            "dec-pass-all": "/dec-pass-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-            "ban-reset": "/ban-reset",
-        }
-        # 输出文案
-        self.messages = {
-            "command_error": "语法错误，{command} 的语法应为 {commands_text}",
-            "time_zeroset_error": "{command} 已被设置永久时限，不支持叠加操作",
-            "banned_user": "已在 {umo} 禁用以下用户 {user}，时限：{time}，理由：{reason}",
-            "banned_user_global": "已全局禁用 {user}，时限：{time}，理由：{reason}",
-            "passed_user": "已在 {umo} 临时解限 {user}，时限：{time}，理由：{reason}",
-            "passed_user_global": "已在全局临时解限 {user}，时限：{time}，理由：{reason}",
-            "dec_banned_user": "已删除在 {umo} 对 {user} 的禁用（{time}），理由：{reason}",
-            "dec_banned_user_global": "已删除全局对 {user} 的禁用（{time}），理由：{reason}",
-            "dec_passed_user": "已删除在 {umo} 对 {user} 的临时解限（{time}），理由：{reason}",
-            "dec_passed_user_global": "已删除全局对 {user} 的临时解限（{time}），理由：{reason}",
-            "dec_no_record": "未找到记录，可能是因为该用户的记录已过期，无需删除",
-            "dec_zerotime_error": "无法删除，因为该用户的记录时限被设为永久，请设置删除时间为0以强制删除！",
-            "group_banned_list": "本群禁用的用户:",
-            "no_group_banned": "\n本群没有禁用用户呢！",
-            "global_banned_list": "全局禁用的用户:",
-            "no_global_banned": "\n全局没有禁用用户",
-            "group_passed_list": "本群临时解限用户：",
-            "no_group_passed": "\n本群没有临时解限用户呢！",
-            "no_reason": "无理由",
-            "global_passed_list": "全局临时解限用户：",
-            "no_global_passed": "\n全局没有临时解限用户",
-            "banlist_strlist_format": "\n - {user} - {time} - {reason}",
-            "ban_reset_success": "已清除用户 {user} 的所有记录。",
-            "ban_enabled": "已临时启用禁用功能～重启后失效",
-            "ban_disabled": "已临时禁用禁用功能～重启后失效",
-            "help_text": f"""黑名单插件使用指南：
+       
 
-🌸 基础命令：
-{self.commands["ban-help"]} - 查看这份指南
-
-🚫 限制命令：
-{self.commands["ban"]} - 在会话限制用户（若会话内已存在限制，则叠加）
-{self.commands["ban-all"]} - 全局限制用户（若全局已存在限制，则叠加）
-{self.commands["dec-ban"]} - 删除在会话对用户禁用的时限
-{self.commands["dec-ban-all"]} - 删除全局对用户禁用的时限
-
-🎀 解限命令：
-{self.commands["pass"]} - 解除当前会话限制（允许临时解限，若已有解除时限，则叠加）
-{self.commands["pass-all"]} - 解除全局限制（允许临时解限，若已有解除时限，则叠加）
-{self.commands["dec-pass"]} - 删除在会话对用户临时解限的时限
-{self.commands["dec-pass-all"]} - 删除全局对用户临时解限的时限
-{self.commands["ban-reset"]} - 删除一名指定用户的所有记录
-
-📒 查询命令：
-{self.commands["banlist"]} - 查看当前限制名单
-
-⚙️ 功能控制：
-{self.commands["ban-enable"]} - 启用限制功能
-{self.commands["ban-disable"]} - 停用限制功能
-
-⏰ 时间格式说明：
-- 数字+单位：1d(1天)/2h(2小时)/30m(30分钟)/10s(10秒)
-- 默认永久限制
-
-💡 注意事项：
-- 只有管理员可以操作
-- 永久限制/永久解除限制不支持叠加
-- 群内设置优先于全局设置
-- 过期限制会自动清理""",
-        }
-
-    def clear_expired_banned(self):
+    def _clear_expired_banned(self):
         """
         清除过期的禁用列表。
         Ver 0.1.1_MVP_AI
@@ -179,7 +102,7 @@ class ReNeBan(Star):
                 # 添加错误处理，避免一个文件出错影响其他文件
                 logger.error(f"清理文件 {file_path} 时出错: {e}")
 
-    def clear_redundant_banned(self):
+    def _clear_redundant_banned(self):
         """
         清除冗余的禁用列表。
         Ver 0.1.0_MVP_AI
@@ -262,8 +185,8 @@ class ReNeBan(Star):
         清除禁用列表。
         Ver 0.1.0_MVP
         """
-        self.clear_expired_banned()
-        self.clear_redundant_banned()
+        self._clear_expired_banned()
+        self._clear_redundant_banned()
 
     def is_banned(self, event: AstrMessageEvent) -> tuple[bool, str | None]:
         """
@@ -415,16 +338,16 @@ class ReNeBan(Star):
         # 禁用功能未启用
         if not self.enable:
             group_banned_text = (
-                self.messages["group_banned_list"] + self.messages["no_group_banned"]
+                strings.messages["group_banned_list"] + strings.messages["no_group_banned"]
             )
             global_banned_text = (
-                self.messages["global_banned_list"] + self.messages["no_global_banned"]
+                strings.messages["global_banned_list"] + strings.messages["no_global_banned"]
             )
             group_passed_text = (
-                self.messages["group_passed_list"] + self.messages["no_group_passed"]
+                strings.messages["group_passed_list"] + strings.messages["no_group_passed"]
             )
             global_passed_text = (
-                self.messages["global_passed_list"] + self.messages["no_global_passed"]
+                strings.messages["global_passed_list"] + strings.messages["no_global_passed"]
             )
             result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
             yield event.plain_result(result)
@@ -451,7 +374,7 @@ class ReNeBan(Star):
             banlist.get(umo) if isinstance(banlist.get(umo), list) else []
         )
         group_banned_str_list = [
-            self.messages["banlist_strlist_format"].format(
+            strings.messages["banlist_strlist_format"].format(
                 user=item.get("uid"),
                 time=self.timelast_format(
                     (item.get("time") - int(time_module.time()))
@@ -460,14 +383,14 @@ class ReNeBan(Star):
                 ),
                 reason=item.get("reason")
                 if item.get("reason")
-                else self.messages["no_reason"],
+                else strings.messages["no_reason"],
             )
             for item in group_banned_list
         ]
         if not group_banned_str_list:
-            group_banned_str_list.append(self.messages["no_group_banned"])
+            group_banned_str_list.append(strings.messages["no_group_banned"])
         global_banned_str_list = [
-            self.messages["banlist_strlist_format"].format(
+            strings.messages["banlist_strlist_format"].format(
                 user=item.get("uid"),
                 time=self.timelast_format(
                     (item.get("time") - int(time_module.time()))
@@ -476,14 +399,14 @@ class ReNeBan(Star):
                 ),
                 reason=item.get("reason")
                 if item.get("reason")
-                else self.messages["no_reason"],
+                else strings.messages["no_reason"],
             )
             for item in global_banned_list
         ]
         if not global_banned_str_list:
-            global_banned_str_list.append(self.messages["no_global_banned"])
+            global_banned_str_list.append(strings.messages["no_global_banned"])
         group_passed_str_list = [
-            self.messages["banlist_strlist_format"].format(
+            strings.messages["banlist_strlist_format"].format(
                 user=item.get("uid"),
                 time=self.timelast_format(
                     (item.get("time") - int(time_module.time()))
@@ -492,14 +415,14 @@ class ReNeBan(Star):
                 ),
                 reason=item.get("reason")
                 if item.get("reason")
-                else self.messages["no_reason"],
+                else strings.messages["no_reason"],
             )
             for item in group_passed_list
         ]
         if not group_passed_str_list:
-            group_passed_str_list.append(self.messages["no_group_passed"])
+            group_passed_str_list.append(strings.messages["no_group_passed"])
         global_passed_str_list = [
-            self.messages["banlist_strlist_format"].format(
+            strings.messages["banlist_strlist_format"].format(
                 user=item.get("uid"),
                 time=self.timelast_format(
                     (item.get("time") - int(time_module.time()))
@@ -508,23 +431,23 @@ class ReNeBan(Star):
                 ),
                 reason=item.get("reason")
                 if item.get("reason")
-                else self.messages["no_reason"],
+                else strings.messages["no_reason"],
             )
             for item in global_passed_list
         ]
         if not global_passed_str_list:
-            global_passed_str_list.append(self.messages["no_global_passed"])
+            global_passed_str_list.append(strings.messages["no_global_passed"])
 
-        group_banned_text = self.messages["group_banned_list"] + "".join(
+        group_banned_text = strings.messages["group_banned_list"] + "".join(
             group_banned_str_list
         )
-        global_banned_text = self.messages["global_banned_list"] + "".join(
+        global_banned_text = strings.messages["global_banned_list"] + "".join(
             global_banned_str_list
         )
-        group_passed_text = self.messages["group_passed_list"] + "".join(
+        group_passed_text = strings.messages["group_passed_list"] + "".join(
             group_passed_str_list
         )
-        global_passed_text = self.messages["global_passed_list"] + "".join(
+        global_passed_text = strings.messages["global_passed_list"] + "".join(
             global_passed_str_list
         )
 
@@ -549,7 +472,7 @@ class ReNeBan(Star):
         启用禁用功能
         """
         self.enable = True
-        yield event.plain_result(self.messages["ban_enabled"])
+        yield event.plain_result(strings.messages["ban_enabled"])
         logger.warning(
             f"已临时启用禁用功能(In {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
@@ -561,7 +484,7 @@ class ReNeBan(Star):
         停用禁用功能
         """
         self.enable = False
-        yield event.plain_result(self.messages["ban_disabled"])
+        yield event.plain_result(strings.messages["ban_disabled"])
         logger.warning(
             f"已临时禁用禁用功能(In {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
@@ -571,7 +494,7 @@ class ReNeBan(Star):
         """
         显示reneban帮助信息
         """
-        yield event.plain_result(self.messages["help_text"])
+        yield event.plain_result(strings.messages["help_text"])
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban")
@@ -594,15 +517,15 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban", commands_text=self.commands["ban"]
+                strings.messages["command_error"].format(
+                    command="ban", commands_text=strings.commands["ban"]
                 )
             )
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         # 我没法了（（（
@@ -614,8 +537,8 @@ class ReNeBan(Star):
                 ban_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban", commands_text=self.commands["ban"]
+                strings.messages["command_error"].format(
+                    command="ban", commands_text=strings.commands["ban"]
                 )
             )
             return
@@ -631,7 +554,7 @@ class ReNeBan(Star):
             if item.get("uid") == ban_uid:
                 if item.get("time") == 0:
                     yield event.plain_result(
-                        self.messages["time_zeroset_error"].format(command="ban")
+                        strings.messages["time_zeroset_error"].format(command="ban")
                     )
                     return
                 else:
@@ -658,7 +581,7 @@ class ReNeBan(Star):
             json.dumps(banlist, indent=4, ensure_ascii=False), encoding="utf-8"
         )
         yield event.plain_result(
-            self.messages["banned_user"].format(
+            strings.messages["banned_user"].format(
                 umo=umo, user=ban_uid, time=self.time_format(time), reason=reason
             )
         )
@@ -683,12 +606,12 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban-all", commands_text=self.commands["ban-all"]
+                strings.messages["command_error"].format(
+                    command="ban-all", commands_text=strings.commands["ban-all"]
                 )
             )
             return
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -699,8 +622,8 @@ class ReNeBan(Star):
                 ban_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban-all", commands_text=self.commands["ban-all"]
+                strings.messages["command_error"].format(
+                    command="ban-all", commands_text=strings.commands["ban-all"]
                 )
             )
             return
@@ -712,7 +635,7 @@ class ReNeBan(Star):
             if item.get("uid") == ban_uid:
                 if item.get("time") == 0:
                     yield event.plain_result(
-                        self.messages["time_zeroset_error"].format(command="ban-all")
+                        strings.messages["time_zeroset_error"].format(command="ban-all")
                     )
                     return
                 else:
@@ -741,7 +664,7 @@ class ReNeBan(Star):
             json.dumps(banall_list, indent=4, ensure_ascii=False), encoding="utf-8"
         )
         yield event.plain_result(
-            self.messages["banned_user_global"].format(
+            strings.messages["banned_user_global"].format(
                 user=ban_uid, time=self.time_format(time), reason=reason
             )
         )
@@ -767,15 +690,15 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="pass", commands_text=self.commands["pass"]
+                strings.messages["command_error"].format(
+                    command="pass", commands_text=strings.commands["pass"]
                 )
             )
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -786,8 +709,8 @@ class ReNeBan(Star):
                 pass_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="pass", commands_text=self.commands["pass"]
+                strings.messages["command_error"].format(
+                    command="pass", commands_text=strings.commands["pass"]
                 )
             )
             return
@@ -802,7 +725,7 @@ class ReNeBan(Star):
             if item.get("uid") == pass_uid:
                 if item.get("time") == 0:
                     yield event.plain_result(
-                        self.messages["time_zeroset_error"].format(command="pass")
+                        strings.messages["time_zeroset_error"].format(command="pass")
                     )
                     return
                 else:
@@ -828,7 +751,7 @@ class ReNeBan(Star):
             json.dumps(passlist, indent=4, ensure_ascii=False), encoding="utf-8"
         )
         yield event.plain_result(
-            self.messages["passed_user"].format(
+            strings.messages["passed_user"].format(
                 umo=umo, user=pass_uid, time=self.time_format(time), reason=reason
             )
         )
@@ -853,12 +776,12 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="pass-all", commands_text=self.commands["pass-all"]
+                strings.messages["command_error"].format(
+                    command="pass-all", commands_text=strings.commands["pass-all"]
                 )
             )
             return
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -869,8 +792,8 @@ class ReNeBan(Star):
                 pass_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="pass-all", commands_text=self.commands["pass-all"]
+                strings.messages["command_error"].format(
+                    command="pass-all", commands_text=strings.commands["pass-all"]
                 )
             )
             return
@@ -882,7 +805,7 @@ class ReNeBan(Star):
             if item.get("uid") == pass_uid:
                 if item.get("time") == 0:
                     yield event.plain_result(
-                        self.messages["time_zeroset_error"].format(command="pass-all")
+                        strings.messages["time_zeroset_error"].format(command="pass-all")
                     )
                     return
                 else:
@@ -908,7 +831,7 @@ class ReNeBan(Star):
             json.dumps(passall_list, indent=4, ensure_ascii=False), encoding="utf-8"
         )
         yield event.plain_result(
-            self.messages["passed_user_global"].format(
+            strings.messages["passed_user_global"].format(
                 user=pass_uid, time=self.time_format(time), reason=reason
             )
         )
@@ -934,15 +857,15 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-pass", commands_text=self.commands["dec-pass"]
+                strings.messages["command_error"].format(
+                    command="dec-pass", commands_text=strings.commands["dec-pass"]
                 )
             )
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -953,8 +876,8 @@ class ReNeBan(Star):
                 pass_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-pass", commands_text=self.commands["dec-pass"]
+                strings.messages["command_error"].format(
+                    command="dec-pass", commands_text=strings.commands["dec-pass"]
                 )
             )
             return
@@ -963,7 +886,7 @@ class ReNeBan(Star):
         passlist = json.loads(tmpdata)
         group_passed_list = passlist.get(umo)
         if not isinstance(group_passed_list, list):
-            yield event.plain_result(self.messages["dec_no_record"])
+            yield event.plain_result(strings.messages["dec_no_record"])
             return
         for item in group_passed_list:
             if item.get("uid") == pass_uid:
@@ -974,7 +897,7 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_passed_user"].format(
+                        strings.messages["dec_passed_user"].format(
                             umo=umo,
                             user=pass_uid,
                             time=self.time_format(time),
@@ -983,7 +906,7 @@ class ReNeBan(Star):
                     )
                     return
                 if item.get("time") == 0:
-                    yield event.plain_result(self.messages["dec_zerotime_error"])
+                    yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
                     item["time"] = item["time"] - self.timestr_to_int(time)
@@ -993,7 +916,7 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_passed_user"].format(
+                        strings.messages["dec_passed_user"].format(
                             umo=umo,
                             user=pass_uid,
                             time=self.time_format(time),
@@ -1001,7 +924,7 @@ class ReNeBan(Star):
                         )
                     )
                     return
-        yield event.plain_result(self.messages["dec_no_record"])
+        yield event.plain_result(strings.messages["dec_no_record"])
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-pass-all")
@@ -1023,12 +946,12 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-pass-all", commands_text=self.commands["dec-pass-all"]
+                strings.messages["command_error"].format(
+                    command="dec-pass-all", commands_text=strings.commands["dec-pass-all"]
                 )
             )
             return
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -1039,8 +962,8 @@ class ReNeBan(Star):
                 pass_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-pass-all", commands_text=self.commands["dec-pass-all"]
+                strings.messages["command_error"].format(
+                    command="dec-pass-all", commands_text=strings.commands["dec-pass-all"]
                 )
             )
             return
@@ -1056,7 +979,7 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_passed_user_global"].format(
+                        strings.messages["dec_passed_user_global"].format(
                             user=pass_uid, time=self.time_format(time), reason=reason
                         )
                     )
@@ -1069,12 +992,12 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_passed_user_global"].format(
+                        strings.messages["dec_passed_user_global"].format(
                             user=pass_uid, time=self.time_format(time), reason=reason
                         )
                     )
                     return
-        yield event.plain_result(self.messages["dec_no_record"])
+        yield event.plain_result(strings.messages["dec_no_record"])
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-ban")
@@ -1097,15 +1020,15 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-ban", commands_text=self.commands["dec-ban"]
+                strings.messages["command_error"].format(
+                    command="dec-ban", commands_text=strings.commands["dec-ban"]
                 )
             )
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -1116,8 +1039,8 @@ class ReNeBan(Star):
                 ban_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-ban", commands_text=self.commands["dec-ban"]
+                strings.messages["command_error"].format(
+                    command="dec-ban", commands_text=strings.commands["dec-ban"]
                 )
             )
             return
@@ -1126,7 +1049,7 @@ class ReNeBan(Star):
         banlist = json.loads(tmpdata)
         group_banned_list = banlist.get(umo)
         if not isinstance(group_banned_list, list):
-            yield event.plain_result(self.messages["dec_no_record"])
+            yield event.plain_result(strings.messages["dec_no_record"])
             return
         for item in group_banned_list:
             if item.get("uid") == ban_uid:
@@ -1137,7 +1060,7 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_banned_user"].format(
+                        strings.messages["dec_banned_user"].format(
                             umo=umo,
                             user=ban_uid,
                             time=self.time_format(time),
@@ -1146,7 +1069,7 @@ class ReNeBan(Star):
                     )
                     return
                 if item["time"] == 0:
-                    yield event.plain_result(self.messages["dec_zerotime_error"])
+                    yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
                     item["time"] = item["time"] - self.timestr_to_int(time)
@@ -1156,7 +1079,7 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_banned_user"].format(
+                        strings.messages["dec_banned_user"].format(
                             umo=umo,
                             user=ban_uid,
                             time=self.time_format(time),
@@ -1164,7 +1087,7 @@ class ReNeBan(Star):
                         )
                     )
                     return
-        yield event.plain_result(self.messages["dec_no_record"])
+        yield event.plain_result(strings.messages["dec_no_record"])
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-ban-all")
@@ -1186,12 +1109,12 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-ban-all", commands_text=self.commands["dec-ban-all"]
+                strings.messages["command_error"].format(
+                    command="dec-ban-all", commands_text=strings.commands["dec-ban-all"]
                 )
             )
             return
-        if reason in self.no_reason:
+        if reason in strings.no_reason:
             # 若reason在no_reason中，则reason为None（无理由）
             reason = None
         try:
@@ -1202,8 +1125,8 @@ class ReNeBan(Star):
                 ban_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="dec-ban-all", commands_text=self.commands["dec-ban-all"]
+                strings.messages["command_error"].format(
+                    command="dec-ban-all", commands_text=strings.commands["dec-ban-all"]
                 )
             )
             return
@@ -1219,13 +1142,13 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_banned_user_global"].format(
+                        strings.messages["dec_banned_user_global"].format(
                             user=ban_uid, time=self.time_format(time), reason=reason
                         )
                     )
                     return
                 if item["time"] == 0:
-                    yield event.plain_result(self.messages["dec_zerotime_error"])
+                    yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
                     item["time"] = item["time"] - self.timestr_to_int(time)
@@ -1235,12 +1158,12 @@ class ReNeBan(Star):
                         encoding="utf-8",
                     )
                     yield event.plain_result(
-                        self.messages["dec_banned_user_global"].format(
+                        strings.messages["dec_banned_user_global"].format(
                             user=ban_uid, time=self.time_format(time), reason=reason
                         )
                     )
                     return
-        yield event.plain_result(self.messages["dec_no_record"])
+        yield event.plain_result(strings.messages["dec_no_record"])
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban-reset")
@@ -1256,8 +1179,8 @@ class ReNeBan(Star):
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban-reset", commands_text=self.commands["ban-reset"]
+                strings.messages["command_error"].format(
+                    command="ban-reset", commands_text=strings.commands["ban-reset"]
                 )
             )
             return
@@ -1269,8 +1192,8 @@ class ReNeBan(Star):
                 reset_uid = self.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
-                self.messages["command_error"].format(
-                    command="ban-reset", commands_text=self.commands["ban-reset"]
+                strings.messages["command_error"].format(
+                    command="ban-reset", commands_text=strings.commands["ban-reset"]
                 )
             )
             return
@@ -1307,10 +1230,11 @@ class ReNeBan(Star):
         )
 
         yield event.plain_result(
-            self.messages["ban_reset_success"].format(user=reset_uid)
+            strings.messages["ban_reset_success"].format(user=reset_uid)
         )
 
-    @filter.event_message_type(filter.EventMessageType.ALL)
+    # 设置优先级，可在其他未设置优先级（priority=0）的命令/监听器/钩子前过滤
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=1)
     async def filter_banned_users(self, event: AstrMessageEvent):
         """
         全局事件过滤器：
