@@ -4,7 +4,6 @@ Handles file operations for ban lists and other data storage
 """
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Union
 
 
 class DatafileManager:
@@ -44,7 +43,7 @@ class DatafileManager:
                 path.write_text("[]", encoding="utf-8")
     
     @staticmethod
-    def read_file(file_path: Path) -> Union[Dict, List, Any]:
+    def read_file(file_path: Path) -> dict | list | object:
         """
         读取JSON文件内容
 
@@ -58,7 +57,7 @@ class DatafileManager:
         return json.loads(raw_data)
 
     @staticmethod
-    def write_file(file_path: Path, data: Union[Dict, List, Any]) -> None:
+    def write_file(file_path: Path, data: dict | list | object) -> None:
         """
         将数据写入JSON文件
 
@@ -71,7 +70,7 @@ class DatafileManager:
             encoding="utf-8",
         )
     
-    def _clear_expired_data(self, data: Union[Dict, List], is_dict: bool = False) -> Union[Dict, List]:
+    def _clear_expired_data(self, data: dict | list, is_dict: bool = False) -> dict | list:
         """
         清除过期的数据项
 
