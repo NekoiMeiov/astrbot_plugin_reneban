@@ -4,6 +4,7 @@ Handles file operations for ban lists and other data storage
 """
 import json
 from pathlib import Path
+from .user_manager import UserDataModel, UserDataList
 
 
 class DatafileManager:
@@ -43,7 +44,7 @@ class DatafileManager:
                 path.write_text("[]", encoding="utf-8")
     
     @staticmethod
-    def read_file(file_path: Path) -> dict | list | object:
+    def read_file(file_path: Path) -> dict[str, UserDataList] | UserDataList | object:
         """
         读取JSON文件内容
 
@@ -51,13 +52,27 @@ class DatafileManager:
             file_path: 要读取的文件路径
 
         Returns:
-            解析后的JSON数据
+            解析后的JSON数据，字典结构的键为字符串，值为UserDataList；列表结构为UserDataList
         """
         raw_data = file_path.read_text(encoding="utf-8")
-        return json.loads(raw_data)
+        data = json.loads(raw_data)
+
+        # 根据文件路径判断结构并转换为相应的对象
+        if str(file_path).endswith(('ban_list.json', 'passlist.json')):
+            # 这些是字典结构 {umo: [items]}
+            result = {}
+            for key, value in data.items():
+                result[key] = UserDataList([UserDataModel.from_dict(item) for item in value])
+            return result
+        elif str(file_path).endswith(('banall_list.json', 'passall_list.json')):
+            # 这些是列表结构 [items]
+            return UserDataList([UserDataModel.from_dict(item) for item in data])
+        else:
+            # 对于未知格式，返回原始数据
+            return data
 
     @staticmethod
-    def write_file(file_path: Path, data: dict | list | object) -> None:
+    def write_file(file_path: Path, data: dict[str, UserDataList] | UserDataList | object) -> None:
         """
         将数据写入JSON文件
 
@@ -65,12 +80,26 @@ class DatafileManager:
             file_path: 要写入的文件路径
             data: 要写入的数据
         """
+        # 将 UserDataList/Model 对象转换为普通字典/列表
+        if isinstance(data, UserDataList):
+            serializable_data = [dict(item) for item in data]
+        elif isinstance(data, dict):
+            serializable_data = {}
+            for key, value in data.items():
+                if isinstance(value, UserDataList):
+                    serializable_data[key] = [dict(item) for item in value]
+                else:
+                    serializable_data[key] = value
+        else:
+            serializable_data = data
+
         file_path.write_text(
-            json.dumps(data, indent=4, ensure_ascii=False),
+            json.dumps(serializable_data, indent=4, ensure_ascii=False),
             encoding="utf-8",
         )
     
-    def _clear_expired_data(self, data: dict | list, is_dict: bool = False) -> dict | list:
+    def _clear_expired_data(self, data: dict[str, UserDataList] | UserDataList,
+                           is_dict: bool = False) -> dict[str, UserDataList] | UserDataList:
         """
         清除过期的数据项
 
@@ -85,28 +114,30 @@ class DatafileManager:
         current_time = int(time.time())
 
         if is_dict:
-            # 字典结构：{umo: [items]}
+            # 字典结构：{umo: UserDataList}
             for key in list(data.keys()):
-                data[key] = [
+                # 过滤掉过期的项
+                data[key] = UserDataList([
                     item
                     for item in data[key]
                     if not (
-                        item.get("time", 0) < current_time
-                        and item.get("time", 0) != 0
+                        item.time < current_time
+                        and item.time != 0
                     )
-                ]
+                ])
                 # 如果该umo下没有项目了，删除空键
                 if not data[key]:
                     del data[key]
         else:
-            # 列表结构：[items]
-            data[:] = [
+            # 列表结构：UserDataList
+            # 过滤掉过期的项
+            data = UserDataList([
                 item
                 for item in data
                 if not (
-                    item.get("time", 0) < current_time and item.get("time", 0) != 0
+                    item.time < current_time and item.time != 0
                 )
-            ]
+            ])
         return data
 
     def _clear_redundant_banned(self) -> None:
@@ -114,59 +145,64 @@ class DatafileManager:
         清除冗余的禁用数据
         """
         # 加载所有数据
-        banall_data = DatafileManager.read_file(self.banall_list_path)
-        passall_data = DatafileManager.read_file(self.passall_list_path)
-        ban_data = DatafileManager.read_file(self.banlist_path)
-        pass_data = DatafileManager.read_file(self.passlist_path)
+        banall_data = DatafileManager.read_file(self.banall_list_path)  # UserDataList
+        passall_data = DatafileManager.read_file(self.passall_list_path)  # UserDataList
+        ban_data = DatafileManager.read_file(self.banlist_path)  # dict[str, UserDataList]
+        pass_data = DatafileManager.read_file(self.passlist_path)  # dict[str, UserDataList]
 
         # 处理ban_data中的冗余
         for umo in list(ban_data.keys()):
             if umo in pass_data:
-                pass_list = pass_data[umo]
-                ban_list = ban_data[umo]
+                pass_list = pass_data[umo]  # UserDataList
+                ban_list = ban_data[umo]  # UserDataList
 
                 # 创建pass项的uid到time的映射
-                pass_time_map = {item["uid"]: item.get("time", 0) for item in pass_list}
+                pass_time_map = {item.uid: item.time for item in pass_list}
 
                 # 过滤ban_list，保留那些没有对应pass项，或者pass项时间不更新的项
-                ban_data[umo] = [
+                # 特别注意：如果ban是永久的（time=0），pass不应该覆盖它
+                ban_data[umo] = UserDataList([
                     ban_item
                     for ban_item in ban_list
-                    if ban_item["uid"] not in pass_time_map
-                    or pass_time_map[ban_item["uid"]] <= ban_item.get("time", 0)
-                ]
+                    if ban_item.uid not in pass_time_map
+                    or (pass_time_map[ban_item.uid] <= ban_item.time and ban_item.time != 0)
+                    or (pass_time_map[ban_item.uid] != 0 and ban_item.time == 0)  # 永久ban不会被临时pass覆盖
+                ])
 
                 # 如果该umo下没有ban项了，删除空键
                 if not ban_data[umo]:
                     del ban_data[umo]
 
         # 处理banall_data中的冗余
-        passall_time_map = {item["uid"]: item.get("time", 0) for item in passall_data}
+        passall_time_map = {item.uid: item.time for item in passall_data}
 
-        banall_data = [
+        banall_data = UserDataList([
             ban_item
             for ban_item in banall_data
-            if ban_item["uid"] not in passall_time_map
-            or passall_time_map[ban_item["uid"]] <= ban_item.get("time", 0)
-        ]
+            if ban_item.uid not in passall_time_map
+            or (passall_time_map[ban_item.uid] <= ban_item.time and ban_item.time != 0)
+            or (passall_time_map[ban_item.uid] != 0 and ban_item.time == 0)  # 永久ban不会被临时pass覆盖
+        ])
 
-        # 处理passall_data，只保留在banall_data中存在的uid
-        banall_uids = {item["uid"] for item in banall_data}
-        passall_data = [item for item in passall_data if item["uid"] in banall_uids]
+        # 处理passall_data，只保留对应在banall_data中存在的uid
+        # 如果没有对应的banall记录，passall记录就是冗余的，应该被移除
+        banall_uids = {item.uid for item in banall_data}
+        passall_data = UserDataList([item for item in passall_data if item.uid in banall_uids])
 
-        # 处理pass_data，只保留在ban_data或banall_data中存在的uid
-        combine_ban_uids = set()
+        # 处理pass_data，只保留对应在ban_data或banall_data中存在的uid
+        # 如果没有对应的ban或banall记录，pass记录就是冗余的，应该被移除
+        combined_ban_uids = set()
         # 收集所有ban_data中的uid
         for umo_ban_list in ban_data.values():
-            combine_ban_uids.update(item["uid"] for item in umo_ban_list)
+            combined_ban_uids.update(item.uid for item in umo_ban_list)
         # 添加banall_data中的uid
-        combine_ban_uids.update(banall_uids)
+        combined_ban_uids.update(banall_uids)
 
         # 过滤pass_data
         for umo in list(pass_data.keys()):
-            pass_data[umo] = [
-                item for item in pass_data[umo] if item["uid"] in combine_ban_uids
-            ]
+            pass_data[umo] = UserDataList([
+                item for item in pass_data[umo] if item.uid in combined_ban_uids
+            ])
             # 如果该umo下没有pass项了，删除空键
             if not pass_data[umo]:
                 del pass_data[umo]
