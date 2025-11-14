@@ -7,21 +7,25 @@ class InvalidKeyError(KeyError):
     pass
 
 
-class BanPassUserData(dict):
-    __slots__ = ()                                # 防止再挂新属性
+class UserDataModel(dict):
+    __slots__ = ('_initialized', 'uid', 'time', 'reason')  # 定义属性槽和初始化标志
     ALLOWED_KEYS = frozenset({"uid", "time", "reason"})
     IMMUTABLE_KEYS = frozenset({"uid"})           # 真正只读字段
 
     # ---------- 构造 ----------
     def __init__(self, uid: str, time: int, reason: str = "无理由"):
         super().__init__(uid=uid, time=time, reason=reason)
-        for k in self.ALLOWED_KEYS:
-            super().__setattr__(k, self[k])
+        # 直接设置属性，绕过 __setattr__ 检查
+        object.__setattr__(self, 'uid', uid)
+        object.__setattr__(self, 'time', time)
+        object.__setattr__(self, 'reason', reason)
+        object.__setattr__(self, '_initialized', True)
 
     # ---------- 反序列化 ----------
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "BanPassUserData":
-        return cls(**{k: v for k, v in data.items() if k in cls.ALLOWED_KEYS})
+    def from_dict(cls, data: dict[str, object]) -> 'UserDataModel':
+        filtered_data = {k: v for k, v in data.items() if k in cls.ALLOWED_KEYS}
+        return cls(**filtered_data)
 
     # ---------- 字典通道 ----------
     def __setitem__(self, key, value):
@@ -30,16 +34,24 @@ class BanPassUserData(dict):
         if key in self.IMMUTABLE_KEYS and key in self:
             raise InvalidKeyError(f"{key} is immutable")
         super().__setitem__(key, value)
-        super().__setattr__(key, value)
+        object.__setattr__(self, key, value)
 
     # ---------- 属性通道 ----------
     def __setattr__(self, name, value):
         if name in self.ALLOWED_KEYS:
-            self[name] = value          # 走字典通道，保证统一校验
+            # 使用字典通道以确保验证
+            self[name] = value
         elif name.startswith("_") or getattr(self.__class__, name, None):
             super().__setattr__(name, value)
         else:
             raise InvalidKeyError(name)
+
+    # ---------- 属性访问 ----------
+    def __getattr__(self, name):
+        # 为 uid, time, reason 提供属性访问方式
+        if name in self.ALLOWED_KEYS:
+            return self[name]
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     # ---------- 业务接口 ----------
     def update_data(self, *, time: int | None = None, reason: str | None = None):
@@ -47,11 +59,6 @@ class BanPassUserData(dict):
             self["time"] = time
         if reason is not None:
             self["reason"] = reason
-
-    # ---------- 只读属性 ----------
-    @property
-    def uid(self) -> str:
-        return self["uid"]
 
     def add_time(self, seconds: int, reason: str | None = None):
         """
@@ -89,3 +96,135 @@ class BanPassUserData(dict):
             new_time = self.time - seconds
 
         self.update_data(time=new_time, reason=reason)
+
+
+class UserDataList(list):
+    """
+    存放 UserDataModel 实例的列表
+    """
+
+    def __init__(self, iterable=None):
+        super().__init__()
+        if iterable:
+            for item in iterable:
+                self.append(item)
+
+    def append(self, obj: UserDataModel):
+        """
+        添加一个 UserDataModel 实例到列表中
+        """
+        if not isinstance(obj, UserDataModel):
+            raise TypeError(f"只能添加 UserDataModel 实例，但传入了 {type(obj)}")
+        super().append(obj)
+
+    def extend(self, iterable):
+        """
+        扩展列表，只接受 UserDataModel 实例
+        """
+        for item in iterable:
+            self.append(item)
+
+    def insert(self, index: int, obj: UserDataModel):
+        """
+        在指定位置插入 UserDataModel 实例
+        """
+        if not isinstance(obj, UserDataModel):
+            raise TypeError(f"只能插入 UserDataModel 实例，但传入了 {type(obj)}")
+        super().insert(index, obj)
+
+    def find_by_uid(self, uid: str) -> UserDataModel | None:
+        """
+        根据 uid 查找用户数据
+        """
+        for user_data in self:
+            if user_data.uid == uid:
+                return user_data
+        return None
+
+    def remove_by_uid(self, uid: str) -> bool:
+        """
+        根据 uid 移除用户数据
+        :param uid: 要移除的用户 ID
+        :return: 如果找到并移除则返回 True，否则返回 False
+        """
+        for i, user_data in enumerate(self):
+            if user_data.uid == uid:
+                self.pop(i)
+                return True
+        return False
+
+
+    def update_user(self, uid: str, new_time: int, reason: str | None = None) -> bool:
+        """
+        更新指定用户的禁用时间
+        :param uid: 用户 ID
+        :param new_time: 新的禁用时间
+        :param reason: 更新理由（可选）
+        :return: 如果找到用户并更新成功则返回 True，否则返回 False
+        """
+        user_data = self.find_by_uid(uid)
+        if user_data:
+            user_data.update_data(time=new_time, reason=reason)
+            return True
+        return False
+
+    def update_user_reason(self, uid: str, new_reason: str) -> bool:
+        """
+        更新指定用户的禁用理由
+        :param uid: 用户 ID
+        :param new_reason: 新的禁用理由
+        :return: 如果找到用户并更新成功则返回 True，否则返回 False
+        """
+        user_data = self.find_by_uid(uid)
+        if user_data:
+            user_data.update_data(reason=new_reason)
+            return True
+        return False
+
+    def update_user_full(self, uid: str, new_time: int | None = None, new_reason: str | None = None) -> bool:
+        """
+        更新指定用户的禁用时间与理由
+        :param uid: 用户 ID
+        :param new_time: 新的禁用时间（可选）
+        :param new_reason: 新的禁用理由（可选）
+        :return: 如果找到用户并更新成功则返回 True，否则返回 False
+        """
+        user_data = self.find_by_uid(uid)
+        if user_data:
+            user_data.update_data(time=new_time, reason=new_reason)
+            return True
+        return False
+
+    def add_time_to_user(self, uid: str, seconds: int, reason: str | None = None) -> bool:
+        """
+        为指定用户增加时间
+        :param uid: 用户 ID
+        :param seconds: 要增加的时间（秒）
+        :param reason: 操作理由（可选）
+        :return: 如果找到用户并操作成功则返回 True，否则返回 False
+        """
+        user_data = self.find_by_uid(uid)
+        if user_data:
+            try:
+                user_data.add_time(seconds, reason)
+                return True
+            except ValueError:
+                return False  # 如果是永久记录则无法增加时间
+        return False
+
+    def subtract_time_from_user(self, uid: str, seconds: int, reason: str | None = None) -> bool:
+        """
+        为指定用户减少时间
+        :param uid: 用户 ID
+        :param seconds: 要减少的时间（秒）
+        :param reason: 操作理由（可选）
+        :return: 如果找到用户并操作成功则返回 True，否则返回 False
+        """
+        user_data = self.find_by_uid(uid)
+        if user_data:
+            try:
+                user_data.subtract_time(seconds, reason)
+                return True
+            except ValueError:
+                return False  # 如果是永久记录则无法减少时间
+        return False

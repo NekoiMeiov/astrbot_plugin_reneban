@@ -9,6 +9,7 @@ import re
 
 from . import strings, time_utils
 from .datafile_manager import DatafileManager
+from .user_manager import UserDataList, UserDataModel
 
 
 class AtNumberError(ValueError):
@@ -42,37 +43,37 @@ class ReNeBan(Star):
         # 获取UMO
         umo = event.unified_msg_origin
         # pass
-        # 使用数据管理器读取数据
-        passlist = self.data_manager.read_file(self.data_manager.passlist_path)
+        # 使用数据管理器读取数据，现在返回的是 UserDataList | dict[str, UserDataList]
+        passlist = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
         # 如果不存在则返回空列表
-        umo_pass_list = passlist.get(umo) if isinstance(passlist.get(umo), list) else []
-        # 遍历umo_pass_list中字典对象的ban_uid键
+        umo_pass_list = passlist.get(umo) if isinstance(passlist.get(umo), UserDataList) else UserDataList()
+        # 遍历umo_pass_list中用户数据的uid
         for item in umo_pass_list:
-            if item.get("uid") == event.get_sender_id():
-                return (False, item.get("reason"))
+            if item.uid == event.get_sender_id():
+                return (False, item.reason)
         # ban
         # 使用数据管理器读取数据
-        banlist = self.data_manager.read_file(self.data_manager.banlist_path)
+        banlist = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
         # 如果不存在则返回空列表
-        umo_ban_list = banlist.get(umo) if isinstance(banlist.get(umo), list) else []
-        # 遍历umo_ban_list中字典对象的ban_uid键
+        umo_ban_list = banlist.get(umo) if isinstance(banlist.get(umo), UserDataList) else UserDataList()
+        # 遍历umo_ban_list中用户数据的uid
         for item in umo_ban_list:
-            if item.get("uid") == event.get_sender_id():
-                return (True, item.get("reason"))
+            if item.uid == event.get_sender_id():
+                return (True, item.reason)
         # pass-all
         # 使用数据管理器读取数据
-        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)
-        # 遍历passall_list中字典对象的ban_uid键
+        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
+        # 遍历passall_list中用户数据的uid
         for item in passall_list:
-            if item.get("uid") == event.get_sender_id():
-                return (False, item.get("reason"))
+            if item.uid == event.get_sender_id():
+                return (False, item.reason)
         # ban-all
         # 使用数据管理器读取数据
-        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)
-        # 遍历banall_list中字典对象的ban_uid键
+        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
+        # 遍历banall_list中用户数据的uid
         for item in banall_list:
-            if item.get("uid") == event.get_sender_id():
-                return (True, item.get("reason"))
+            if item.uid == event.get_sender_id():
+                return (True, item.reason)
         return (False, None)
 
     def get_event_at(self, event: AstrMessageEvent) -> str | None:
@@ -119,29 +120,29 @@ class ReNeBan(Star):
         # 获取UMO
         umo = event.unified_msg_origin
         # get_pass
-        passlist = self.data_manager.read_file(self.data_manager.passlist_path)
+        passlist = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
         group_passed_list = (
-            passlist.get(umo) if isinstance(passlist.get(umo), list) else []
+            passlist.get(umo) if isinstance(passlist.get(umo), UserDataList) else UserDataList()
         )
         # get_pass-all
-        global_passed_list = self.data_manager.read_file(self.data_manager.passall_list_path)
+        global_passed_list = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
         # get_ban-all
-        global_banned_list = self.data_manager.read_file(self.data_manager.banall_list_path)
+        global_banned_list = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
         # get_ban
-        banlist = self.data_manager.read_file(self.data_manager.banlist_path)
+        banlist = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
         group_banned_list = (
-            banlist.get(umo) if isinstance(banlist.get(umo), list) else []
+            banlist.get(umo) if isinstance(banlist.get(umo), UserDataList) else UserDataList()
         )
         group_banned_str_list = [
             strings.messages["banlist_strlist_format"].format(
-                user=item.get("uid"),
+                user=item.uid,
                 time=time_utils.timelast_format(
-                    (item.get("time") - int(time_module.time()))
-                    if item.get("time") != 0
+                    (item.time - int(time_module.time()))
+                    if item.time != 0
                     else 0
                 ),
-                reason=item.get("reason")
-                if item.get("reason")
+                reason=item.reason
+                if item.reason
                 else strings.messages["no_reason"],
             )
             for item in group_banned_list
@@ -150,14 +151,14 @@ class ReNeBan(Star):
             group_banned_str_list.append(strings.messages["no_group_banned"])
         global_banned_str_list = [
             strings.messages["banlist_strlist_format"].format(
-                user=item.get("uid"),
+                user=item.uid,
                 time=time_utils.timelast_format(
-                    (item.get("time") - int(time_module.time()))
-                    if item.get("time") != 0
+                    (item.time - int(time_module.time()))
+                    if item.time != 0
                     else 0
                 ),
-                reason=item.get("reason")
-                if item.get("reason")
+                reason=item.reason
+                if item.reason
                 else strings.messages["no_reason"],
             )
             for item in global_banned_list
@@ -166,14 +167,14 @@ class ReNeBan(Star):
             global_banned_str_list.append(strings.messages["no_global_banned"])
         group_passed_str_list = [
             strings.messages["banlist_strlist_format"].format(
-                user=item.get("uid"),
+                user=item.uid,
                 time=time_utils.timelast_format(
-                    (item.get("time") - int(time_module.time()))
-                    if item.get("time") != 0
+                    (item.time - int(time_module.time()))
+                    if item.time != 0
                     else 0
                 ),
-                reason=item.get("reason")
-                if item.get("reason")
+                reason=item.reason
+                if item.reason
                 else strings.messages["no_reason"],
             )
             for item in group_passed_list
@@ -182,14 +183,14 @@ class ReNeBan(Star):
             group_passed_str_list.append(strings.messages["no_group_passed"])
         global_passed_str_list = [
             strings.messages["banlist_strlist_format"].format(
-                user=item.get("uid"),
+                user=item.uid,
                 time=time_utils.timelast_format(
-                    (item.get("time") - int(time_module.time()))
-                    if item.get("time") != 0
+                    (item.time - int(time_module.time()))
+                    if item.time != 0
                     else 0
                 ),
-                reason=item.get("reason")
-                if item.get("reason")
+                reason=item.reason
+                if item.reason
                 else strings.messages["no_reason"],
             )
             for item in global_passed_list
@@ -303,38 +304,35 @@ class ReNeBan(Star):
             return
         # 准备ban_user
         self.data_manager.clear_banned()
-        banlist = self.data_manager.read_file(self.data_manager.banlist_path)
-        if not isinstance(banlist.get(umo), list):
-            banlist[umo] = []
-        group_banned_list = banlist.get(umo)
+        banlist = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
+        if not isinstance(banlist.get(umo), UserDataList):
+            banlist[umo] = UserDataList()
+        group_banned_list = banlist.get(umo)  # UserDataList
         tempbool = False
         for item in group_banned_list:
-            if item.get("uid") == ban_uid:
-                if item.get("time") == 0:
+            if item.uid == ban_uid:
+                if item.time == 0:
                     yield event.plain_result(
                         strings.messages["time_zeroset_error"].format(command="ban")
                     )
                     return
                 else:
-                    item["time"] = (
-                        (item["time"] + time_utils.timestr_to_int(time)) if time != "0" else 0
-                    )
-                    item["reason"] = reason
+                    # 更新时间
+                    new_time = (item.time + time_utils.timestr_to_int(time)) if time != "0" else 0
+                    item.update_data(time=new_time, reason=reason)
                     tempbool = True
                     break
             else:
                 continue
         if not tempbool:
-            group_banned_list.append(
-                {
-                    "uid": ban_uid,
-                    "time": (int(time_module.time()) + time_utils.timestr_to_int(time))
-                    if time != "0"
-                    else 0,
-                    "reason": reason,
-                }
+            # 添加新的封禁记录
+            new_ban_item = UserDataModel(
+                uid=ban_uid,
+                time=(int(time_module.time()) + time_utils.timestr_to_int(time)) if time != "0" else 0,
+                reason=reason
             )
-        logger.warning(f"[ban]{json.dumps(banlist, indent=4, ensure_ascii=False)}")
+            group_banned_list.append(new_ban_item)
+        logger.warning(f"[ban]{json.dumps([{k: [dict(item) for item in v] for k, v in banlist.items()}], indent=4, ensure_ascii=False)}")
         self.data_manager.write_file(self.data_manager.banlist_path, banlist)
         yield event.plain_result(
             strings.messages["banned_user"].format(
@@ -384,36 +382,33 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)
+        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
         tempbool = False
         for item in banall_list:
-            if item.get("uid") == ban_uid:
-                if item.get("time") == 0:
+            if item.uid == ban_uid:
+                if item.time == 0:
                     yield event.plain_result(
                         strings.messages["time_zeroset_error"].format(command="ban-all")
                     )
                     return
                 else:
-                    item["time"] = (
-                        (item["time"] + time_utils.timestr_to_int(time)) if time != "0" else 0
-                    )
-                    item["reason"] = reason
+                    # 更新时间
+                    new_time = (item.time + time_utils.timestr_to_int(time)) if time != "0" else 0
+                    item.update_data(time=new_time, reason=reason)
                     tempbool = True
                     break
             else:
                 continue
         if not tempbool:
-            banall_list.append(
-                {
-                    "uid": ban_uid,
-                    "time": (int(time_module.time()) + time_utils.timestr_to_int(time))
-                    if time != "0"
-                    else 0,
-                    "reason": reason,
-                }
+            # 添加新的全局封禁记录
+            new_ban_item = UserDataModel(
+                uid=ban_uid,
+                time=(int(time_module.time()) + time_utils.timestr_to_int(time)) if time != "0" else 0,
+                reason=reason
             )
+            banall_list.append(new_ban_item)
         logger.warning(
-            f"[ban-all]{json.dumps(banall_list, indent=4, ensure_ascii=False)}"
+            f"[ban-all]{json.dumps([dict(item) for item in banall_list], indent=4, ensure_ascii=False)}"
         )
         self.data_manager.write_file(self.data_manager.banall_list_path, banall_list)
         yield event.plain_result(
@@ -468,37 +463,34 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        passlist = self.data_manager.read_file(self.data_manager.passlist_path)
-        if not isinstance(passlist.get(umo), list):
-            passlist[umo] = []
-        group_passed_list = passlist.get(umo)
+        passlist = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
+        if not isinstance(passlist.get(umo), UserDataList):
+            passlist[umo] = UserDataList()
+        group_passed_list = passlist.get(umo)  # UserDataList
         tempbool = False
         for item in group_passed_list:
-            if item.get("uid") == pass_uid:
-                if item.get("time") == 0:
+            if item.uid == pass_uid:
+                if item.time == 0:
                     yield event.plain_result(
                         strings.messages["time_zeroset_error"].format(command="pass")
                     )
                     return
                 else:
-                    item["time"] = (
-                        (item["time"] + time_utils.timestr_to_int(time)) if time != "0" else 0
-                    )
-                    item["reason"] = reason
+                    # 更新时间
+                    new_time = (item.time + time_utils.timestr_to_int(time)) if time != "0" else 0
+                    item.update_data(time=new_time, reason=reason)
                     tempbool = True
                     break
             else:
                 continue
         if not tempbool:
-            group_passed_list.append(
-                {
-                    "uid": pass_uid,
-                    "time": (int(time_module.time()) + time_utils.timestr_to_int(time))
-                    if time != "0"
-                    else 0,
-                    "reason": reason,
-                }
+            # 添加新的解限记录
+            new_pass_item = UserDataModel(
+                uid=pass_uid,
+                time=(int(time_module.time()) + time_utils.timestr_to_int(time)) if time != "0" else 0,
+                reason=reason
             )
+            group_passed_list.append(new_pass_item)
         self.data_manager.write_file(self.data_manager.passlist_path, passlist)
         yield event.plain_result(
             strings.messages["passed_user"].format(
@@ -548,34 +540,31 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)
+        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
         tempbool = False
         for item in passall_list:
-            if item.get("uid") == pass_uid:
-                if item.get("time") == 0:
+            if item.uid == pass_uid:
+                if item.time == 0:
                     yield event.plain_result(
                         strings.messages["time_zeroset_error"].format(command="pass-all")
                     )
                     return
                 else:
-                    item["time"] = (
-                        (item["time"] + time_utils.timestr_to_int(time)) if time != "0" else 0
-                    )
-                    item["reason"] = reason
+                    # 更新时间
+                    new_time = (item.time + time_utils.timestr_to_int(time)) if time != "0" else 0
+                    item.update_data(time=new_time, reason=reason)
                     tempbool = True
                     break
             else:
                 continue
         if not tempbool:
-            passall_list.append(
-                {
-                    "uid": pass_uid,
-                    "time": (int(time_module.time()) + time_utils.timestr_to_int(time))
-                    if time != "0"
-                    else 0,
-                    "reason": reason,
-                }
+            # 添加新的全局解限记录
+            new_pass_item = UserDataModel(
+                uid=pass_uid,
+                time=(int(time_module.time()) + time_utils.timestr_to_int(time)) if time != "0" else 0,
+                reason=reason
             )
+            passall_list.append(new_pass_item)
         self.data_manager.write_file(self.data_manager.passall_list_path, passall_list)
         yield event.plain_result(
             strings.messages["passed_user_global"].format(
@@ -629,13 +618,13 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        passlist = self.data_manager.read_file(self.data_manager.passlist_path)
-        group_passed_list = passlist.get(umo)
-        if not isinstance(group_passed_list, list):
+        passlist = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
+        group_passed_list = passlist.get(umo)  # UserDataList
+        if not isinstance(group_passed_list, UserDataList):
             yield event.plain_result(strings.messages["dec_no_record"])
             return
         for item in group_passed_list:
-            if item.get("uid") == pass_uid:
+            if item.uid == pass_uid:
                 if time == "0":
                     group_passed_list.remove(item)
                     self.data_manager.write_file(self.data_manager.passlist_path, passlist)
@@ -648,12 +637,12 @@ class ReNeBan(Star):
                         )
                     )
                     return
-                if item.get("time") == 0:
+                if item.time == 0:
                     yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
-                    item["time"] = item["time"] - time_utils.timestr_to_int(time)
-                    item["reason"] = reason
+                    new_time = item.time - time_utils.timestr_to_int(time)
+                    item.update_data(time=new_time, reason=reason)
                     self.data_manager.write_file(self.data_manager.passlist_path, passlist)
                     yield event.plain_result(
                         strings.messages["dec_passed_user"].format(
@@ -708,9 +697,9 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)
+        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
         for item in passall_list:
-            if item.get("uid") == pass_uid:
+            if item.uid == pass_uid:
                 if time == "0":
                     passall_list.remove(item)
                     self.data_manager.write_file(self.data_manager.passall_list_path, passall_list)
@@ -721,8 +710,8 @@ class ReNeBan(Star):
                     )
                     return
                 else:
-                    item["time"] = item["time"] - time_utils.timestr_to_int(time)
-                    item["reason"] = reason
+                    new_time = item.time - time_utils.timestr_to_int(time)
+                    item.update_data(time=new_time, reason=reason)
                     self.data_manager.write_file(self.data_manager.passall_list_path, passall_list)
                     yield event.plain_result(
                         strings.messages["dec_passed_user_global"].format(
@@ -778,13 +767,13 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        banlist = self.data_manager.read_file(self.data_manager.banlist_path)
-        group_banned_list = banlist.get(umo)
-        if not isinstance(group_banned_list, list):
+        banlist = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
+        group_banned_list = banlist.get(umo)  # UserDataList
+        if not isinstance(group_banned_list, UserDataList):
             yield event.plain_result(strings.messages["dec_no_record"])
             return
         for item in group_banned_list:
-            if item.get("uid") == ban_uid:
+            if item.uid == ban_uid:
                 if time == "0":
                     group_banned_list.remove(item)
                     self.data_manager.write_file(self.data_manager.banlist_path, banlist)
@@ -797,12 +786,12 @@ class ReNeBan(Star):
                         )
                     )
                     return
-                if item["time"] == 0:
+                if item.time == 0:
                     yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
-                    item["time"] = item["time"] - time_utils.timestr_to_int(time)
-                    item["reason"] = reason
+                    new_time = item.time - time_utils.timestr_to_int(time)
+                    item.update_data(time=new_time, reason=reason)
                     self.data_manager.write_file(self.data_manager.banlist_path, banlist)
                     yield event.plain_result(
                         strings.messages["dec_banned_user"].format(
@@ -857,25 +846,25 @@ class ReNeBan(Star):
             )
             return
         self.data_manager.clear_banned()
-        banall_list = self.data_manager.read_file(self.banall_list_path)
+        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
         for item in banall_list:
-            if item.get("uid") == ban_uid:
+            if item.uid == ban_uid:
                 if time == "0":
                     banall_list.remove(item)
-                    self.data_manager.write_file(self.banall_list_path, banall_list)
+                    self.data_manager.write_file(self.data_manager.banall_list_path, banall_list)
                     yield event.plain_result(
                         strings.messages["dec_banned_user_global"].format(
                             user=ban_uid, time=time_utils.time_format(time), reason=reason
                         )
                     )
                     return
-                if item["time"] == 0:
+                if item.time == 0:
                     yield event.plain_result(strings.messages["dec_zerotime_error"])
                     return
                 else:
-                    item["time"] = item["time"] - time_utils.timestr_to_int(time)
-                    item["reason"] = reason
-                    self.data_manager.write_file(self.banall_list_path, banall_list)
+                    new_time = item.time - time_utils.timestr_to_int(time)
+                    item.update_data(time=new_time, reason=reason)
+                    self.data_manager.write_file(self.data_manager.banall_list_path, banall_list)
                     yield event.plain_result(
                         strings.messages["dec_banned_user_global"].format(
                             user=ban_uid, time=time_utils.time_format(time), reason=reason
@@ -918,22 +907,22 @@ class ReNeBan(Star):
             return
         self.data_manager.clear_banned()
 
-        banall_data = self.data_manager.read_file(self.data_manager.banall_list_path)
-        passall_data = self.data_manager.read_file(self.data_manager.passall_list_path)
-        ban_data = self.data_manager.read_file(self.data_manager.banlist_path)
-        pass_data = self.data_manager.read_file(self.data_manager.passlist_path)
+        banall_data = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
+        passall_data = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
+        ban_data = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
+        pass_data = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
         # 从全局封禁列表中移除该用户
-        banall_data = [item for item in banall_data if item["uid"] != reset_uid]
+        banall_data = UserDataList([item for item in banall_data if item.uid != reset_uid])
         # 从全局解封列表中移除该用户
-        passall_data = [item for item in passall_data if item["uid"] != reset_uid]
+        passall_data = UserDataList([item for item in passall_data if item.uid != reset_uid])
         # 从各UMO的封禁列表中移除该用户
         for umo in list(ban_data.keys()):
-            ban_data[umo] = [item for item in ban_data[umo] if item["uid"] != reset_uid]
+            ban_data[umo] = UserDataList([item for item in ban_data[umo] if item.uid != reset_uid])
         # 从各UMO的解封列表中移除该用户
         for umo in list(pass_data.keys()):
-            pass_data[umo] = [
-                item for item in pass_data[umo] if item["uid"] != reset_uid
-            ]
+            pass_data[umo] = UserDataList([
+                item for item in pass_data[umo] if item.uid != reset_uid
+            ])
         # 将修改后的数据写回文件
         self.data_manager.write_file(self.data_manager.banall_list_path, banall_data)
         self.data_manager.write_file(self.data_manager.passall_list_path, passall_data)
