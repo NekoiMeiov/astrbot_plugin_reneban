@@ -9,7 +9,7 @@ import re
 
 from . import strings, time_utils
 from .datafile_manager import DatafileManager
-from .user_manager import UserDataList, UserDataModel
+from .user_manager import UserDataList, UserDataModel, EventUtils
 
 
 class AtNumberError(ValueError):
@@ -31,68 +31,7 @@ class ReNeBan(Star):
        
 
 
-    def is_banned(self, event: AstrMessageEvent) -> tuple[bool, str | None]:
-        """
-        判断用户是否被禁用，以及其理由
-        """
-        # 禁用功能未启用
-        if not self.enable:
-            return (False, None)
-        # pass > ban > pass-all > ban-all
-        self.data_manager.clear_banned()
-        # 获取UMO
-        umo = event.unified_msg_origin
-        # pass
-        # 使用数据管理器读取数据，现在返回的是 UserDataList | dict[str, UserDataList]
-        passlist = self.data_manager.read_file(self.data_manager.passlist_path)  # dict[str, UserDataList]
-        # 如果不存在则返回空列表
-        umo_pass_list = passlist.get(umo) if isinstance(passlist.get(umo), UserDataList) else UserDataList()
-        # 遍历umo_pass_list中用户数据的uid
-        for item in umo_pass_list:
-            if item.uid == event.get_sender_id():
-                return (False, item.reason)
-        # ban
-        # 使用数据管理器读取数据
-        banlist = self.data_manager.read_file(self.data_manager.banlist_path)  # dict[str, UserDataList]
-        # 如果不存在则返回空列表
-        umo_ban_list = banlist.get(umo) if isinstance(banlist.get(umo), UserDataList) else UserDataList()
-        # 遍历umo_ban_list中用户数据的uid
-        for item in umo_ban_list:
-            if item.uid == event.get_sender_id():
-                return (True, item.reason)
-        # pass-all
-        # 使用数据管理器读取数据
-        passall_list = self.data_manager.read_file(self.data_manager.passall_list_path)  # UserDataList
-        # 遍历passall_list中用户数据的uid
-        for item in passall_list:
-            if item.uid == event.get_sender_id():
-                return (False, item.reason)
-        # ban-all
-        # 使用数据管理器读取数据
-        banall_list = self.data_manager.read_file(self.data_manager.banall_list_path)  # UserDataList
-        # 遍历banall_list中用户数据的uid
-        for item in banall_list:
-            if item.uid == event.get_sender_id():
-                return (True, item.reason)
-        return (False, None)
 
-    def get_event_at(self, event: AstrMessageEvent) -> str | None:
-        """
-        获取at的用户uid
-        """
-        # 获取所有非自身的 At 用户
-        at_users = [
-            str(seg.qq)
-            for seg in event.get_messages()
-            if isinstance(seg, Comp.At) and str(seg.qq) != event.get_self_id()
-        ]
-
-        # 如果 At 用户数量大于 1，则抛出错误
-        if len(at_users) > 1:
-            raise AtNumberError("消息中包含多个非bot自身的 At 标记")
-
-        # 返回第一个（也是唯一一个）At 用户，如果没有则返回 None
-        return at_users[0] if at_users else None
 
     @filter.command("banlist")
     async def banlist(self, event: AstrMessageEvent):
@@ -291,10 +230,10 @@ class ReNeBan(Star):
         # 我没法了（（（
         try:
             ban_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 ban_uid = banuser
             else:
-                ban_uid = self.get_event_at(event)  # type: ignore
+                ban_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -370,10 +309,10 @@ class ReNeBan(Star):
             reason = None
         try:
             ban_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 ban_uid = banuser
             else:
-                ban_uid = self.get_event_at(event)  # type: ignore
+                ban_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -451,10 +390,10 @@ class ReNeBan(Star):
             reason = None
         try:
             pass_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 pass_uid = passuser
             else:
-                pass_uid = self.get_event_at(event)  # type: ignore
+                pass_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -528,10 +467,10 @@ class ReNeBan(Star):
             reason = None
         try:
             pass_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 pass_uid = passuser
             else:
-                pass_uid = self.get_event_at(event)  # type: ignore
+                pass_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -606,10 +545,10 @@ class ReNeBan(Star):
             reason = None
         try:
             pass_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 pass_uid = passuser
             else:
-                pass_uid = self.get_event_at(event)  # type: ignore
+                pass_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -685,10 +624,10 @@ class ReNeBan(Star):
             reason = None
         try:
             pass_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 pass_uid = passuser
             else:
-                pass_uid = self.get_event_at(event)  # type: ignore
+                pass_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -755,10 +694,10 @@ class ReNeBan(Star):
             reason = None
         try:
             ban_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 ban_uid = banuser
             else:
-                ban_uid = self.get_event_at(event)  # type: ignore
+                ban_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -834,10 +773,10 @@ class ReNeBan(Star):
             reason = None
         try:
             ban_uid: str
-            if self.get_event_at(event) == None:
+            if EventUtils.get_event_at(event) == None:
                 ban_uid = banuser
             else:
-                ban_uid = self.get_event_at(event)  # type: ignore
+                ban_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -894,10 +833,10 @@ class ReNeBan(Star):
             return
         try:
             reset_uid: str
-            if self.get_event_at(event) is None:
+            if EventUtils.get_event_at(event) is None:
                 reset_uid = resetuser
             else:
-                reset_uid = self.get_event_at(event)  # type: ignore
+                reset_uid = EventUtils.get_event_at(event)  # type: ignore
         except AtNumberError:
             yield event.plain_result(
                 strings.messages["command_error"].format(
@@ -940,7 +879,7 @@ class ReNeBan(Star):
         全局事件过滤器：
         如果禁用功能启用且发送者被禁用，则停止事件传播，机器人不再响应该用户的消息。
         """
-        if self.enable and self.is_banned(event)[0]:
+        if self.enable and EventUtils.is_banned(self.enable, self.data_manager, event)[0]:
             event.stop_event()
 
     async def terminate(self):
