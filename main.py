@@ -9,15 +9,7 @@ import re
 
 from . import strings, time_utils
 from .datafile_manager import DatafileManager
-from .user_manager import UserDataList, UserDataModel, EventUtils
-
-
-class AtNumberError(ValueError):
-    """
-    At 数量错误（ReNeBan.get_event_at() 获取@用户时，如果 At 用户数量大于 1，会抛出此错误）
-    """
-
-    pass
+from .user_manager import UserDataList, UserDataModel, EventUtils, AtNumberError
 
 
 class ReNeBan(Star):

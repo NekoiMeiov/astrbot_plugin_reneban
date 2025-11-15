@@ -4,6 +4,13 @@
 from astrbot.api.event import AstrMessageEvent
 
 
+class AtNumberError(ValueError):
+    """
+    At 数量错误（ReNeBan.get_event_at() 获取@用户时，如果 At 用户数量大于 1，会抛出此错误）
+    """
+
+    pass
+
 
 class InvalidKeyError(KeyError):
     pass
@@ -252,7 +259,6 @@ class EventUtils:
 
         # 如果 At 用户数量大于 1，则抛出错误
         if len(at_users) > 1:
-            from .main import AtNumberError
             raise AtNumberError("消息中包含多个非bot自身的 At 标记")
 
         # 返回第一个（也是唯一一个）At 用户，如果没有则返回 None
