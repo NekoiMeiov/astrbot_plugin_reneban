@@ -150,7 +150,7 @@ class DatafileManager:
         ban_data = DatafileManager.read_file(self.banlist_path)  # dict[str, UserDataList]
         pass_data = DatafileManager.read_file(self.passlist_path)  # dict[str, UserDataList]
 
-        # 处理ban_data中的冗余
+        # 1. 处理 pass > ban 的情况：如果 pass_time > ban_time（且 ban_time != 0）或 pass_time == 0，移除 ban
         for umo in list(ban_data.keys()):
             if umo in pass_data:
                 pass_list = pass_data[umo]  # UserDataList
@@ -159,38 +159,38 @@ class DatafileManager:
                 # 创建pass项的uid到time的映射
                 pass_time_map = {item.uid: item.time for item in pass_list}
 
-                # 过滤ban_list，保留那些没有对应pass项，或者pass项时间不更新的项
-                # 特别注意：如果ban是永久的（time=0），pass不应该覆盖它
+                # 过滤ban_list，移除被pass覆盖的记录
+                # 如果用户有pass记录，只有在pass时间不晚于ban时间且两者都不是永久时才保留ban
+                # 永久pass会覆盖永久ban，所以如果pass是永久，ban要被移除
                 ban_data[umo] = UserDataList([
                     ban_item
                     for ban_item in ban_list
                     if ban_item.uid not in pass_time_map
-                    or (pass_time_map[ban_item.uid] <= ban_item.time and ban_item.time != 0)
-                    or (pass_time_map[ban_item.uid] != 0 and ban_item.time == 0)  # 永久ban不会被临时pass覆盖
+                    or (pass_time_map[ban_item.uid] < ban_item.time and pass_time_map[ban_item.uid] != 0)
+                    or (ban_item.time == 0 and pass_time_map[ban_item.uid] != 0)  # 永久ban不会被非永久pass覆盖
                 ])
 
                 # 如果该umo下没有ban项了，删除空键
                 if not ban_data[umo]:
                     del ban_data[umo]
 
-        # 处理banall_data中的冗余
+        # 2. 处理 pass_all > ban_all 的情况：如果 pass_all_time > ban_all_time（且 ban_all_time != 0）或 pass_all_time == 0，移除 ban_all
         passall_time_map = {item.uid: item.time for item in passall_data}
 
         banall_data = UserDataList([
             ban_item
             for ban_item in banall_data
             if ban_item.uid not in passall_time_map
-            or (passall_time_map[ban_item.uid] <= ban_item.time and ban_item.time != 0)
-            or (passall_time_map[ban_item.uid] != 0 and ban_item.time == 0)  # 永久ban不会被临时pass覆盖
+            or (passall_time_map[ban_item.uid] < ban_item.time and passall_time_map[ban_item.uid] != 0)
+            or (ban_item.time == 0 and passall_time_map[ban_item.uid] != 0)  # 永久ban不会被非永久pass覆盖
         ])
 
-        # 处理passall_data，只保留对应在banall_data中存在的uid
-        # 如果没有对应的banall记录，passall记录就是冗余的，应该被移除
+        # 3. 清理冗余的pass记录：pass_all依赖ban_all，pass依赖与它一致的umo的ban&ban_all
+        # 3a. 清理passall：只保留有对应banall的uid
         banall_uids = {item.uid for item in banall_data}
         passall_data = UserDataList([item for item in passall_data if item.uid in banall_uids])
 
-        # 处理pass_data，只保留对应在ban_data或banall_data中存在的uid
-        # 如果没有对应的ban或banall记录，pass记录就是冗余的，应该被移除
+        # 3b. 清理pass：只保留有对应ban或banall的uid
         combined_ban_uids = set()
         # 收集所有ban_data中的uid
         for umo_ban_list in ban_data.values():
