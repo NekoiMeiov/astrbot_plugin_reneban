@@ -1,6 +1,7 @@
 """
 用户(禁用)数据模型，获取at，判断是否禁用，并提供操作接口
 """
+
 from astrbot.api.event import AstrMessageEvent
 
 
@@ -17,22 +18,22 @@ class InvalidKeyError(KeyError):
 
 
 class UserDataModel(dict):
-    __slots__ = ('_initialized', 'uid', 'time', 'reason')  # 定义属性槽和初始化标志
+    __slots__ = ("_initialized", "uid", "time", "reason")  # 定义属性槽和初始化标志
     ALLOWED_KEYS = frozenset({"uid", "time", "reason"})
-    IMMUTABLE_KEYS = frozenset({"uid"})           # 真正只读字段
+    IMMUTABLE_KEYS = frozenset({"uid"})  # 真正只读字段
 
     # ---------- 构造 ----------
     def __init__(self, uid: str, time: int, reason: str = "无理由"):
         super().__init__(uid=uid, time=time, reason=reason)
         # 直接设置属性，绕过 __setattr__ 检查
-        object.__setattr__(self, 'uid', uid)
-        object.__setattr__(self, 'time', time)
-        object.__setattr__(self, 'reason', reason)
-        object.__setattr__(self, '_initialized', True)
+        object.__setattr__(self, "uid", uid)
+        object.__setattr__(self, "time", time)
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "_initialized", True)
 
     # ---------- 反序列化 ----------
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> 'UserDataModel':
+    def from_dict(cls, data: dict[str, object]) -> "UserDataModel":
         filtered_data = {k: v for k, v in data.items() if k in cls.ALLOWED_KEYS}
         return cls(**filtered_data)
 
@@ -60,7 +61,9 @@ class UserDataModel(dict):
         # 为 uid, time, reason 提供属性访问方式
         if name in self.ALLOWED_KEYS:
             return self[name]
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        )
 
     # ---------- 业务接口 ----------
     def update_data(self, *, time: int | None = None, reason: str | None = None):
@@ -162,7 +165,6 @@ class UserDataList(list):
                 return True
         return False
 
-
     def update_user(self, uid: str, new_time: int, reason: str | None = None) -> bool:
         """
         更新指定用户的禁用时间
@@ -190,7 +192,9 @@ class UserDataList(list):
             return True
         return False
 
-    def update_user_full(self, uid: str, new_time: int | None = None, new_reason: str | None = None) -> bool:
+    def update_user_full(
+        self, uid: str, new_time: int | None = None, new_reason: str | None = None
+    ) -> bool:
         """
         更新指定用户的禁用时间与理由
         :param uid: 用户 ID
@@ -204,7 +208,9 @@ class UserDataList(list):
             return True
         return False
 
-    def add_time_to_user(self, uid: str, seconds: int, reason: str | None = None) -> bool:
+    def add_time_to_user(
+        self, uid: str, seconds: int, reason: str | None = None
+    ) -> bool:
         """
         为指定用户增加时间
         :param uid: 用户 ID
@@ -221,7 +227,9 @@ class UserDataList(list):
                 return False  # 如果是永久记录则无法增加时间
         return False
 
-    def subtract_time_from_user(self, uid: str, seconds: int, reason: str | None = None) -> bool:
+    def subtract_time_from_user(
+        self, uid: str, seconds: int, reason: str | None = None
+    ) -> bool:
         """
         为指定用户减少时间
         :param uid: 用户 ID
@@ -251,6 +259,7 @@ class EventUtils:
         """
         # 获取所有非自身的 At 用户
         import astrbot.api.message_components as Comp
+
         at_users = [
             str(seg.qq)
             for seg in event.get_messages()
@@ -266,9 +275,7 @@ class EventUtils:
 
     @staticmethod
     def is_banned(
-        enable: bool,
-        data_manager: 'DatafileManager',
-        event: AstrMessageEvent
+        enable: bool, data_manager: "DatafileManager", event: AstrMessageEvent
     ):
         """
         判断用户是否被禁用，以及其理由
@@ -282,35 +289,50 @@ class EventUtils:
         umo = event.unified_msg_origin
         # pass
         # 使用数据管理器读取数据，现在返回的是 UserDataList | dict[str, UserDataList]
-        passlist = data_manager.read_file(data_manager.passlist_path)  # dict[str, UserDataList]
+        passlist = data_manager.read_file(
+            data_manager.passlist_path
+        )  # dict[str, UserDataList]
         # 如果不存在则返回空列表
-        umo_pass_list = passlist.get(umo) if isinstance(passlist.get(umo), UserDataList) else UserDataList()
+        umo_pass_list = (
+            passlist.get(umo)
+            if isinstance(passlist.get(umo), UserDataList)
+            else UserDataList()
+        )
         # 遍历umo_pass_list中用户数据的uid
         for item in umo_pass_list:
             if item.uid == event.get_sender_id():
                 return (False, item.reason)
         # ban
         # 使用数据管理器读取数据
-        banlist = data_manager.read_file(data_manager.banlist_path)  # dict[str, UserDataList]
+        banlist = data_manager.read_file(
+            data_manager.banlist_path
+        )  # dict[str, UserDataList]
         # 如果不存在则返回空列表
-        umo_ban_list = banlist.get(umo) if isinstance(banlist.get(umo), UserDataList) else UserDataList()
+        umo_ban_list = (
+            banlist.get(umo)
+            if isinstance(banlist.get(umo), UserDataList)
+            else UserDataList()
+        )
         # 遍历umo_ban_list中用户数据的uid
         for item in umo_ban_list:
             if item.uid == event.get_sender_id():
                 return (True, item.reason)
         # pass-all
         # 使用数据管理器读取数据
-        passall_list = data_manager.read_file(data_manager.passall_list_path)  # UserDataList
+        passall_list = data_manager.read_file(
+            data_manager.passall_list_path
+        )  # UserDataList
         # 遍历passall_list中用户数据的uid
         for item in passall_list:
             if item.uid == event.get_sender_id():
                 return (False, item.reason)
         # ban-all
         # 使用数据管理器读取数据
-        banall_list = data_manager.read_file(data_manager.banall_list_path)  # UserDataList
+        banall_list = data_manager.read_file(
+            data_manager.banall_list_path
+        )  # UserDataList
         # 遍历banall_list中用户数据的uid
         for item in banall_list:
             if item.uid == event.get_sender_id():
                 return (True, item.reason)
         return (False, None)
-
