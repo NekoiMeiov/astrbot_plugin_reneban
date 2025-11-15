@@ -44,7 +44,7 @@ class DatafileManager:
                 path.write_text("[]", encoding="utf-8")
     
     @staticmethod
-    def read_file(file_path: Path) -> dict[str, UserDataList] | UserDataList | object:
+    def read_file(file_path: Path) -> dict[str, UserDataList] | UserDataList:
         """
         读取JSON文件内容
 
@@ -68,11 +68,10 @@ class DatafileManager:
             # 这些是列表结构 [items]
             return UserDataList([UserDataModel.from_dict(item) for item in data])
         else:
-            # 对于未知格式，返回原始数据
             return data
 
     @staticmethod
-    def write_file(file_path: Path, data: dict[str, UserDataList] | UserDataList | object) -> None:
+    def write_file(file_path: Path, data: dict[str, UserDataList] | UserDataList) -> None:
         """
         将数据写入JSON文件
 

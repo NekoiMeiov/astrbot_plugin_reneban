@@ -1,6 +1,8 @@
 """
 用户(禁用)数据模型，获取at，判断是否禁用，并提供操作接口
 """
+from astrbot.api.event import AstrMessageEvent
+
 
 
 class InvalidKeyError(KeyError):
@@ -228,3 +230,81 @@ class UserDataList(list):
             except ValueError:
                 return False  # 如果是永久记录则无法减少时间
         return False
+
+
+class EventUtils:
+    """
+    事件工具类，包含处理事件的静态方法
+    """
+
+    @staticmethod
+    def get_event_at(event: AstrMessageEvent) -> str | None:
+        """
+        获取at的用户uid
+        """
+        # 获取所有非自身的 At 用户
+        import astrbot.api.message_components as Comp
+        at_users = [
+            str(seg.qq)
+            for seg in event.get_messages()
+            if isinstance(seg, Comp.At) and str(seg.qq) != event.get_self_id()
+        ]
+
+        # 如果 At 用户数量大于 1，则抛出错误
+        if len(at_users) > 1:
+            from .main import AtNumberError
+            raise AtNumberError("消息中包含多个非bot自身的 At 标记")
+
+        # 返回第一个（也是唯一一个）At 用户，如果没有则返回 None
+        return at_users[0] if at_users else None
+
+    @staticmethod
+    def is_banned(
+        enable: bool,
+        data_manager: 'DatafileManager',
+        event: AstrMessageEvent
+    ):
+        """
+        判断用户是否被禁用，以及其理由
+        """
+        # 禁用功能未启用
+        if not enable:
+            return (False, None)
+        # pass > ban > pass-all > ban-all
+        data_manager.clear_banned()
+        # 获取UMO
+        umo = event.unified_msg_origin
+        # pass
+        # 使用数据管理器读取数据，现在返回的是 UserDataList | dict[str, UserDataList]
+        passlist = data_manager.read_file(data_manager.passlist_path)  # dict[str, UserDataList]
+        # 如果不存在则返回空列表
+        umo_pass_list = passlist.get(umo) if isinstance(passlist.get(umo), UserDataList) else UserDataList()
+        # 遍历umo_pass_list中用户数据的uid
+        for item in umo_pass_list:
+            if item.uid == event.get_sender_id():
+                return (False, item.reason)
+        # ban
+        # 使用数据管理器读取数据
+        banlist = data_manager.read_file(data_manager.banlist_path)  # dict[str, UserDataList]
+        # 如果不存在则返回空列表
+        umo_ban_list = banlist.get(umo) if isinstance(banlist.get(umo), UserDataList) else UserDataList()
+        # 遍历umo_ban_list中用户数据的uid
+        for item in umo_ban_list:
+            if item.uid == event.get_sender_id():
+                return (True, item.reason)
+        # pass-all
+        # 使用数据管理器读取数据
+        passall_list = data_manager.read_file(data_manager.passall_list_path)  # UserDataList
+        # 遍历passall_list中用户数据的uid
+        for item in passall_list:
+            if item.uid == event.get_sender_id():
+                return (False, item.reason)
+        # ban-all
+        # 使用数据管理器读取数据
+        banall_list = data_manager.read_file(data_manager.banall_list_path)  # UserDataList
+        # 遍历banall_list中用户数据的uid
+        for item in banall_list:
+            if item.uid == event.get_sender_id():
+                return (True, item.reason)
+        return (False, None)
+
