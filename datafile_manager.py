@@ -55,23 +55,61 @@ class DatafileManager:
         Returns:
             解析后的JSON数据，字典结构的键为字符串，值为UserDataList；列表结构为UserDataList
         """
-        raw_data = file_path.read_text(encoding="utf-8")
-        data = json.loads(raw_data)
+        try:
+            raw_data = file_path.read_text(encoding="utf-8")
+            data = json.loads(raw_data)
 
-        # 根据文件路径判断结构并转换为相应的对象
-        if str(file_path).endswith(("ban_list.json", "passlist.json")):
-            # 这些是字典结构 {umo: [items]}
-            result = {}
-            for key, value in data.items():
-                result[key] = UserDataList(
-                    [UserDataModel.from_dict(item) for item in value]
-                )
-            return result
-        elif str(file_path).endswith(("banall_list.json", "passall_list.json")):
-            # 这些是列表结构 [items]
-            return UserDataList([UserDataModel.from_dict(item) for item in data])
-        else:
-            return data
+            # 根据文件路径判断结构并转换为相应的对象
+            if str(file_path).endswith(("ban_list.json", "passlist.json")):
+                # 验证数据类型是字典
+                if not isinstance(data, dict):
+                    from astrbot.api import logger
+                    logger.error(f"文件 {file_path} 应该是字典类型，但实际是 {type(data).__name__}。返回空字典。")
+                    return {}
+
+                # 这些是字典结构 {umo: [items]}
+                result = {}
+                for key, value in data.items():
+                    # 验证字典中的值是列表类型
+                    if not isinstance(value, list):
+                        from astrbot.api import logger
+                        logger.error(f"文件 {file_path} 中键 '{key}' 的值应该是列表类型，但实际是 {type(value).__name__}。跳过该键。")
+                        continue
+                    result[key] = UserDataList(
+                        [UserDataModel.from_dict(item) for item in value]
+                    )
+                return result
+            elif str(file_path).endswith(("banall_list.json", "passall_list.json")):
+                # 验证数据类型是列表
+                if not isinstance(data, list):
+                    from astrbot.api import logger
+                    logger.error(f"文件 {file_path} 应该是列表类型，但实际是 {type(data).__name__}。返回空列表。")
+                    return UserDataList([])
+
+                # 这些是列表结构 [items]
+                return UserDataList([UserDataModel.from_dict(item) for item in data])
+            else:
+                return data
+        except json.JSONDecodeError as e:
+            from astrbot.api import logger
+            logger.error(f"无法解析JSON文件 {file_path}: {e}")
+            # 根据文件路径返回对应类型的空数据结构
+            if str(file_path).endswith(("ban_list.json", "passlist.json")):
+                return {}
+            elif str(file_path).endswith(("banall_list.json", "passall_list.json")):
+                return UserDataList([])
+            else:
+                return {}
+        except Exception as e:
+            from astrbot.api import logger
+            logger.error(f"读取文件 {file_path} 时发生未知错误: {e}")
+            # 根据文件路径返回对应类型的空数据结构
+            if str(file_path).endswith(("ban_list.json", "passlist.json")):
+                return {}
+            elif str(file_path).endswith(("banall_list.json", "passall_list.json")):
+                return UserDataList([])
+            else:
+                return {}
 
     @staticmethod
     def write_file(
