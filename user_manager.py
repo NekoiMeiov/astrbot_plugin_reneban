@@ -3,6 +3,7 @@
 """
 
 from astrbot.api.event import AstrMessageEvent
+import astrbot.api.message_components as Comp
 
 
 class AtNumberError(ValueError):
@@ -258,7 +259,6 @@ class EventUtils:
         获取at的用户uid
         """
         # 获取所有非自身的 At 用户
-        import astrbot.api.message_components as Comp
 
         at_users = [
             str(seg.qq)

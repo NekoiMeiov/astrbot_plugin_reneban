@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 from .user_manager import UserDataModel, UserDataList
+from astrbot.api import logger
 
 
 class DatafileManager:
@@ -104,8 +105,6 @@ class DatafileManager:
             if str(file_path).endswith(("ban_list.json", "passlist.json")):
                 # 验证数据类型是字典
                 if not isinstance(data, dict):
-                    from astrbot.api import logger
-
                     logger.error(
                         f"文件 {file_path} 应该是字典类型，但实际是 {type(data).__name__}。返回空字典。"
                     )
@@ -116,8 +115,6 @@ class DatafileManager:
                 for key, value in data.items():
                     # 验证字典中的值是列表类型
                     if not isinstance(value, list):
-                        from astrbot.api import logger
-
                         logger.error(
                             f"文件 {file_path} 中键 '{key}' 的值应该是列表类型，但实际是 {type(value).__name__}。跳过该键。"
                         )
@@ -129,8 +126,6 @@ class DatafileManager:
             elif str(file_path).endswith(("banall_list.json", "passall_list.json")):
                 # 验证数据类型是列表
                 if not isinstance(data, list):
-                    from astrbot.api import logger
-
                     logger.error(
                         f"文件 {file_path} 应该是列表类型，但实际是 {type(data).__name__}。返回空列表。"
                     )
@@ -141,8 +136,6 @@ class DatafileManager:
             else:
                 return data
         except json.JSONDecodeError as e:
-            from astrbot.api import logger
-
             logger.error(f"无法解析JSON文件 {file_path}: {e}")
             # 根据文件路径返回对应类型的空数据结构
             if str(file_path).endswith(("ban_list.json", "passlist.json")):
@@ -152,8 +145,6 @@ class DatafileManager:
             else:
                 return {}
         except Exception as e:
-            from astrbot.api import logger
-
             logger.error(f"读取文件 {file_path} 时发生未知错误: {e}")
             # 根据文件路径返回对应类型的空数据结构
             if str(file_path).endswith(("ban_list.json", "passlist.json")):
@@ -205,7 +196,6 @@ class DatafileManager:
         Returns:
             清理后的数据
         """
-        import time
 
         current_time = int(time.time())
 
@@ -242,12 +232,8 @@ class DatafileManager:
         # 加载所有数据
         banall_data = self.read_file(self.banall_list_path)  # UserDataList
         passall_data = self.read_file(self.passall_list_path)  # UserDataList
-        ban_data = self.read_file(
-            self.banlist_path
-        )  # dict[str, UserDataList]
-        pass_data = self.read_file(
-            self.passlist_path
-        )  # dict[str, UserDataList]
+        ban_data = self.read_file(self.banlist_path)  # dict[str, UserDataList]
+        pass_data = self.read_file(self.passlist_path)  # dict[str, UserDataList]
 
         # 1. 处理 pass > ban 的情况：如果 pass_time > ban_time（且 ban_time != 0）或 pass_time == 0，移除 ban
         for umo in list(ban_data.keys()):
@@ -332,8 +318,6 @@ class DatafileManager:
         """
         清除过期的禁用数据
         """
-        import time
-        from astrbot.api import logger
 
         current_time = int(time.time())
 

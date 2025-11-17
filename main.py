@@ -144,17 +144,6 @@ class ReNeBan(Star):
         result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
         yield event.plain_result(result)
 
-    # def time_format(self, time_stamp: int) -> str:
-    #     """
-    #     将时间戳格式化为易读的日期时间字符串
-    #     """
-    #     if time_stamp == 0:
-    #         return "永久"
-
-    #     import datetime
-    #     dt = datetime.datetime.fromtimestamp(time_stamp)
-    #     return dt.strftime("%Y-%m-%d %H:%M:%S")
-
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban-enable")
     async def ban_enable(self, event: AstrMessageEvent):
