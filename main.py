@@ -17,8 +17,10 @@ class ReNeBan(Star):
         super().__init__(context)
         # 从插件配置中获取是否启用禁用功能，默认为启用
         self.enable = config.get("enable", True)
+        # 从插件配置中获取缓存存活时间，默认为60秒
+        cache_ttl = config.get("cache_ttl", 60)
         # 初始化数据文件管理器
-        self.data_manager = DatafileManager(StarTools.get_data_dir())
+        self.data_manager = DatafileManager(StarTools.get_data_dir(), cache_ttl=cache_ttl)
 
     @filter.command("banlist")
     async def banlist(self, event: AstrMessageEvent):
