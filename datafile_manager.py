@@ -240,12 +240,12 @@ class DatafileManager:
         清除冗余的禁用数据
         """
         # 加载所有数据
-        banall_data = DatafileManager.read_file(self.banall_list_path)  # UserDataList
-        passall_data = DatafileManager.read_file(self.passall_list_path)  # UserDataList
-        ban_data = DatafileManager.read_file(
+        banall_data = self.read_file(self.banall_list_path)  # UserDataList
+        passall_data = self.read_file(self.passall_list_path)  # UserDataList
+        ban_data = self.read_file(
             self.banlist_path
         )  # dict[str, UserDataList]
-        pass_data = DatafileManager.read_file(
+        pass_data = self.read_file(
             self.passlist_path
         )  # dict[str, UserDataList]
 
@@ -323,10 +323,10 @@ class DatafileManager:
                 del pass_data[umo]
 
         # 保存所有数据
-        DatafileManager.write_file(self.banlist_path, ban_data)
-        DatafileManager.write_file(self.passlist_path, pass_data)
-        DatafileManager.write_file(self.banall_list_path, banall_data)
-        DatafileManager.write_file(self.passall_list_path, passall_data)
+        self.write_file(self.banlist_path, ban_data)
+        self.write_file(self.passlist_path, pass_data)
+        self.write_file(self.banall_list_path, banall_data)
+        self.write_file(self.passall_list_path, passall_data)
 
     def _clear_expired_banned(self) -> None:
         """
@@ -347,9 +347,9 @@ class DatafileManager:
 
         for file_path, is_dict in lists_to_clear:
             try:
-                raw_data = DatafileManager.read_file(file_path)
+                raw_data = self.read_file(file_path)
                 cleared_data = self._clear_expired_data(raw_data, is_dict)
-                DatafileManager.write_file(file_path, cleared_data)
+                self.write_file(file_path, cleared_data)
             except Exception as e:
                 # 添加错误处理，避免一个文件出错影响其他文件
                 logger.error(f"清理文件 {file_path} 时出错: {e}")
