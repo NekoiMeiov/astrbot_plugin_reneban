@@ -31,10 +31,10 @@ class DatafileManager:
 
         # 初始化缓存相关变量
         self._passlist_cache = None  # 会话解禁列表缓存 (dict[str, UserDataList])
-        self._banlist_cache = None   # 会话禁用列表缓存 (dict[str, UserDataList])
+        self._banlist_cache = None  # 会话禁用列表缓存 (dict[str, UserDataList])
         self._passall_list_cache = None  # 全局解禁列表缓存 (UserDataList)
-        self._banall_list_cache = None   # 全局禁用列表缓存 (UserDataList)
-        self._cache_timestamp = 0    # 缓存创建时间戳
+        self._banall_list_cache = None  # 全局禁用列表缓存 (UserDataList)
+        self._cache_timestamp = 0  # 缓存创建时间戳
         self._cache_ttl = cache_ttl  # 缓存存活时间（秒）
 
         # 初始化文件
@@ -63,12 +63,15 @@ class DatafileManager:
         """
         current_time = time.time()
         return (
-            all(cache is not None for cache in [
-                self._passlist_cache,
-                self._banlist_cache,
-                self._passall_list_cache,
-                self._banall_list_cache
-            ])
+            all(
+                cache is not None
+                for cache in [
+                    self._passlist_cache,
+                    self._banlist_cache,
+                    self._passall_list_cache,
+                    self._banall_list_cache,
+                ]
+            )
             and current_time - self._cache_timestamp < self._cache_ttl
         )
 
@@ -102,7 +105,10 @@ class DatafileManager:
                 # 验证数据类型是字典
                 if not isinstance(data, dict):
                     from astrbot.api import logger
-                    logger.error(f"文件 {file_path} 应该是字典类型，但实际是 {type(data).__name__}。返回空字典。")
+
+                    logger.error(
+                        f"文件 {file_path} 应该是字典类型，但实际是 {type(data).__name__}。返回空字典。"
+                    )
                     return {}
 
                 # 这些是字典结构 {umo: [items]}
@@ -111,7 +117,10 @@ class DatafileManager:
                     # 验证字典中的值是列表类型
                     if not isinstance(value, list):
                         from astrbot.api import logger
-                        logger.error(f"文件 {file_path} 中键 '{key}' 的值应该是列表类型，但实际是 {type(value).__name__}。跳过该键。")
+
+                        logger.error(
+                            f"文件 {file_path} 中键 '{key}' 的值应该是列表类型，但实际是 {type(value).__name__}。跳过该键。"
+                        )
                         continue
                     result[key] = UserDataList(
                         [UserDataModel.from_dict(item) for item in value]
@@ -121,7 +130,10 @@ class DatafileManager:
                 # 验证数据类型是列表
                 if not isinstance(data, list):
                     from astrbot.api import logger
-                    logger.error(f"文件 {file_path} 应该是列表类型，但实际是 {type(data).__name__}。返回空列表。")
+
+                    logger.error(
+                        f"文件 {file_path} 应该是列表类型，但实际是 {type(data).__name__}。返回空列表。"
+                    )
                     return UserDataList([])
 
                 # 这些是列表结构 [items]
@@ -130,6 +142,7 @@ class DatafileManager:
                 return data
         except json.JSONDecodeError as e:
             from astrbot.api import logger
+
             logger.error(f"无法解析JSON文件 {file_path}: {e}")
             # 根据文件路径返回对应类型的空数据结构
             if str(file_path).endswith(("ban_list.json", "passlist.json")):
@@ -140,6 +153,7 @@ class DatafileManager:
                 return {}
         except Exception as e:
             from astrbot.api import logger
+
             logger.error(f"读取文件 {file_path} 时发生未知错误: {e}")
             # 根据文件路径返回对应类型的空数据结构
             if str(file_path).endswith(("ban_list.json", "passlist.json")):

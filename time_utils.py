@@ -1,6 +1,10 @@
 # 所有时间转换都在这里
 import re
 
+_TIME_RE = re.compile(
+    r"^(?=.*\d)(?:(?P<days>\d+)d)?(?:(?P<hours>\d+)h)?(?:(?P<minutes>\d+)m)?(?:(?P<seconds>\d+)s?)?$"
+)
+
 
 def timelast_format(time_last: int) -> str:
     """
@@ -64,9 +68,7 @@ def timestr_to_int(timestr: str) -> int:
     将时间字符串（如 1d2h3m4）转换为秒数
     """
     # ^(?=.*\d)(?:(?<days>\d+)d)?(?:(?<hours>\d+)h)?(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s?)$
-    m = re.compile(
-        r"^(?=.*\d)(?:(?P<days>\d+)d)?(?:(?P<hours>\d+)h)?(?:(?P<minutes>\d+)m)?(?:(?P<seconds>\d+)s?)?$"
-    ).fullmatch(timestr)
+    m = _TIME_RE.fullmatch(timestr)
     if not m:
         raise ValueError(f"非法的时间字符串格式: {timestr!r}")
 
