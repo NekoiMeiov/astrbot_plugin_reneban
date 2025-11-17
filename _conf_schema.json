@@ -3,5 +3,10 @@
         "description": "是否启用禁用功能",
         "type": "bool",
         "default": true
+    },
+    "cache_ttl": {
+        "description": "缓存存活时间（秒）",
+        "type": "int",
+        "default": 60
     }
 }

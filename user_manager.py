@@ -284,55 +284,42 @@ class EventUtils:
         if not enable:
             return (False, None)
         # pass > ban > pass-all > ban-all
-        data_manager.clear_banned()
+        # 检查缓存是否有效，如果无效则调用clear_banned重建缓存
+        if not data_manager._is_cache_valid():
+            data_manager.clear_banned()
+
         # 获取UMO
         umo = event.unified_msg_origin
-        # pass
-        # 使用数据管理器读取数据，现在返回的是 UserDataList | dict[str, UserDataList]
-        passlist = data_manager.read_file(
-            data_manager.passlist_path
-        )  # dict[str, UserDataList]
+        # pass - 使用缓存数据
         # 如果不存在则返回空列表
         umo_pass_list = (
-            passlist.get(umo)
-            if isinstance(passlist.get(umo), UserDataList)
+            data_manager._passlist_cache.get(umo)
+            if isinstance(data_manager._passlist_cache.get(umo), UserDataList)
             else UserDataList()
         )
         # 遍历umo_pass_list中用户数据的uid
         for item in umo_pass_list:
             if item.uid == event.get_sender_id():
                 return (False, item.reason)
-        # ban
-        # 使用数据管理器读取数据
-        banlist = data_manager.read_file(
-            data_manager.banlist_path
-        )  # dict[str, UserDataList]
+        # ban - 使用缓存数据
         # 如果不存在则返回空列表
         umo_ban_list = (
-            banlist.get(umo)
-            if isinstance(banlist.get(umo), UserDataList)
+            data_manager._banlist_cache.get(umo)
+            if isinstance(data_manager._banlist_cache.get(umo), UserDataList)
             else UserDataList()
         )
         # 遍历umo_ban_list中用户数据的uid
         for item in umo_ban_list:
             if item.uid == event.get_sender_id():
                 return (True, item.reason)
-        # pass-all
-        # 使用数据管理器读取数据
-        passall_list = data_manager.read_file(
-            data_manager.passall_list_path
-        )  # UserDataList
+        # pass-all - 使用缓存数据
         # 遍历passall_list中用户数据的uid
-        for item in passall_list:
+        for item in data_manager._passall_list_cache:
             if item.uid == event.get_sender_id():
                 return (False, item.reason)
-        # ban-all
-        # 使用数据管理器读取数据
-        banall_list = data_manager.read_file(
-            data_manager.banall_list_path
-        )  # UserDataList
+        # ban-all - 使用缓存数据
         # 遍历banall_list中用户数据的uid
-        for item in banall_list:
+        for item in data_manager._banall_list_cache:
             if item.uid == event.get_sender_id():
                 return (True, item.reason)
         return (False, None)

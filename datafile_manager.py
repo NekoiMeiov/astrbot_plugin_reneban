@@ -4,6 +4,7 @@ Handles file operations for ban lists and other data storage
 """
 
 import json
+import time
 from pathlib import Path
 from .user_manager import UserDataModel, UserDataList
 
@@ -13,12 +14,13 @@ class DatafileManager:
     Manages data files for the ReNeBan plugin
     """
 
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, cache_ttl: int = 60):
         """
         初始化数据文件管理器
 
         Args:
             data_dir: 数据目录的Path对象
+            cache_ttl: 缓存存活时间（秒），默认60秒
         """
         self.data_dir = data_dir
         # 定义文件路径
@@ -26,6 +28,14 @@ class DatafileManager:
         self.banall_list_path = self.data_dir / "banall_list.json"
         self.passlist_path = self.data_dir / "passlist.json"
         self.passall_list_path = self.data_dir / "passall_list.json"
+
+        # 初始化缓存相关变量
+        self._passlist_cache = None  # 会话解禁列表缓存 (dict[str, UserDataList])
+        self._banlist_cache = None   # 会话禁用列表缓存 (dict[str, UserDataList])
+        self._passall_list_cache = None  # 全局解禁列表缓存 (UserDataList)
+        self._banall_list_cache = None   # 全局禁用列表缓存 (UserDataList)
+        self._cache_timestamp = 0    # 缓存创建时间戳
+        self._cache_ttl = cache_ttl  # 缓存存活时间（秒）
 
         # 初始化文件
         self._initialize_files()
@@ -43,6 +53,34 @@ class DatafileManager:
             path.touch(exist_ok=True)
             if path.stat().st_size == 0:
                 path.write_text("[]", encoding="utf-8")
+
+    def _is_cache_valid(self) -> bool:
+        """
+        检查缓存是否有效
+
+        Returns:
+            bool: 如果缓存存在且未过期则返回 True，否则返回 False
+        """
+        current_time = time.time()
+        return (
+            all(cache is not None for cache in [
+                self._passlist_cache,
+                self._banlist_cache,
+                self._passall_list_cache,
+                self._banall_list_cache
+            ])
+            and current_time - self._cache_timestamp < self._cache_ttl
+        )
+
+    def _invalidate_and_reload_cache(self):
+        """
+        内部方法：清理并重新加载缓存
+        """
+        self._passlist_cache = self.read_file(self.passlist_path)
+        self._banlist_cache = self.read_file(self.banlist_path)
+        self._passall_list_cache = self.read_file(self.passall_list_path)
+        self._banall_list_cache = self.read_file(self.banall_list_path)
+        self._cache_timestamp = time.time()
 
     @staticmethod
     def read_file(file_path: Path) -> dict[str, UserDataList] | UserDataList:
@@ -304,7 +342,9 @@ class DatafileManager:
 
     def clear_banned(self) -> None:
         """
-        清除过期和冗余的禁用数据
+        清除过期和冗余的禁用数据，并重建缓存
         """
         self._clear_expired_banned()
         self._clear_redundant_banned()
+        # 清理并重新加载缓存
+        self._invalidate_and_reload_cache()
