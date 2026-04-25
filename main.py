@@ -23,6 +23,10 @@ class ReNeBan(Star):
         self.data_manager = DatafileManager(
             StarTools.get_data_dir(), cache_ttl=cache_ttl
         )
+        # 是否拦截 QQ 临时会话（aiocqhttp sub_type == "group"）
+        self.block_temp_msg = config.get("block_temp_msg", True)
+        # 拦截临时会话时的回复内容（留空则静默拦截）
+        self.temp_msg_reply = config.get("temp_msg_reply", "请勿通过临时会话联系我，请在群内发言。")
 
     @filter.command("banlist")
     async def banlist(self, event: AstrMessageEvent):
@@ -936,13 +940,44 @@ class ReNeBan(Star):
             strings.messages["ban_reset_success"].format(user=reset_uid)
         )
 
+    def _is_temp_message(self, event: AstrMessageEvent) -> bool:
+        """
+        判断是否为 QQ 临时会话。
+        仅对 aiocqhttp 平台有效，其他平台 sub_type 不存在，getattr 返回 None 不会误触发。
+        """
+        try:
+            raw = event.message_obj.raw_message
+            return getattr(raw, "sub_type", None) == "group"
+        except Exception:
+            return False
+
     # 设置优先级，可在其他未设置优先级（priority=0）的命令/监听器/钩子前过滤
     @filter.event_message_type(filter.EventMessageType.ALL, priority=1)
     async def filter_banned_users(self, event: AstrMessageEvent):
         """
         全局事件过滤器：
-        如果禁用功能启用且发送者被禁用，则停止事件传播，机器人不再响应该用户的消息。
+        1. 拦截 QQ 临时会话（aiocqhttp sub_type == "group"）
+        2. 如果禁用功能启用且发送者被禁用，则停止事件传播
         """
+        # --- 临时会话拦截 ---
+        # 注意：临时会话 UMO 为 PrivateMessage 格式，is_banned() 的群维度封禁
+        # 无法命中临时会话，仅全局封禁（ban-all）有效。
+        # 因此强烈建议保持 block_temp_msg=True，否则群维度封禁用户可通过临时会话绕过。
+        if self._is_temp_message(event):
+            if self.block_temp_msg:
+                uid = event.get_sender_id()
+                logger.info(strings.messages["temp_msg_blocked"].format(uid=uid))
+                if self.temp_msg_reply:
+                    yield event.plain_result(self.temp_msg_reply)
+                event.stop_event()
+                return
+            else:
+                # block_temp_msg=False：放行临时会话，但仍走全局封禁兜底（ban-all）。
+                # 群维度封禁（/ban）因 UMO 不匹配临时会话，不会生效。
+                logger.debug(
+                    f"[reneban] 临时会话放行（block_temp_msg=False）: {event.get_sender_id()}"
+                )
+        # --- 封禁用户过滤 ---
         if (
             self.enable
             and EventUtils.is_banned(self.enable, self.data_manager, event)[0]
