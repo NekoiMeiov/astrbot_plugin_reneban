@@ -8,5 +8,17 @@
         "description": "缓存存活时间（秒）",
         "type": "int",
         "default": 60
+    },
+    "block_temp_msg": {
+        "description": "是否拦截 QQ 临时会话",
+        "hint": "仅对 aiocqhttp（QQ 个人号）平台有效。关闭后群维度封禁（/ban）将对临时会话失效，仅全局封禁（/ban-all）仍有效",
+        "type": "bool",
+        "default": true
+    },
+    "temp_msg_reply": {
+        "description": "拦截临时会话时发送的提示语",
+        "hint": "留空则静默拦截，不向对方发送任何消息",
+        "type": "string",
+        "default": "请勿通过临时会话联系我，请在群内发言。"
     }
 }
