@@ -44,6 +44,7 @@ messages = {
     "ban_reset_success": "已清除用户 {user} 的所有记录。",
     "ban_enabled": "已临时启用禁用功能～重启后失效",
     "ban_disabled": "已临时禁用禁用功能～重启后失效",
+    "temp_msg_blocked": "[reneban] 临时会话拦截：{uid} 的临时会话已被屏蔽",
     "help_text": f"""黑名单插件使用指南：
 
 🌸 基础命令：
