@@ -1,5 +1,6 @@
-# 所有时间转换都在这里
 import re
+
+from .exceptions import TimestrValueError
 
 _TIME_RE = re.compile(
     r"^(?=.*\d)(?:(?P<days>\d+)d)?(?:(?P<hours>\d+)h)?(?:(?P<minutes>\d+)m)?(?:(?P<seconds>\d+)s?)?$"
@@ -70,7 +71,7 @@ def timestr_to_int(timestr: str) -> int:
     # ^(?=.*\d)(?:(?<days>\d+)d)?(?:(?<hours>\d+)h)?(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s?)$
     m = _TIME_RE.fullmatch(timestr)
     if not m:
-        raise ValueError(f"非法的时间字符串格式: {timestr!r}")
+        raise TimestrValueError(timestr)
 
     # 命名捕获组一次性全取到，None 的转成 0
     parts = {k: int(v or 0) for k, v in m.groupdict().items()}

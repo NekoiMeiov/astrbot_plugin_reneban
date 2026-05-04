@@ -1,15 +1,20 @@
-# pass > ban > pass-all > ban-all
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, StarTools
 from astrbot.api import logger, AstrBotConfig
-import astrbot.api.message_components as Comp
-import json
 import time as time_module
-import re
 
 from . import strings, time_utils
 from .datafile_manager import DatafileManager
-from .user_manager import UserDataList, UserDataModel, EventUtils, AtNumberError
+from .user_manager import (
+    BaseModelList,
+    BaseDataModel,
+    UserDataList,
+    UserDataModel,
+    UmoDataModel,
+    UmoDataList,
+)
+from .event_utils import EventUtils
+from .exceptions import *
 
 
 class ReNeBan(Star):
@@ -47,101 +52,148 @@ class ReNeBan(Star):
                 strings.messages["global_passed_list"]
                 + strings.messages["no_global_passed"]
             )
-            result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
-            yield event.plain_result(result)
-            return
-        self.data_manager.clear_banned()
-        # 获取UMO
-        umo = event.unified_msg_origin
-        # get_pass
-        passlist = self.data_manager.read_file(
-            self.data_manager.passlist_path
-        )  # dict[str, UserDataList]
-        group_passed_list = (
-            passlist.get(umo)
-            if isinstance(passlist.get(umo), UserDataList)
-            else UserDataList()
-        )
-        # get_pass-all
-        global_passed_list = self.data_manager.read_file(
-            self.data_manager.passall_list_path
-        )  # UserDataList
-        # get_ban-all
-        global_banned_list = self.data_manager.read_file(
-            self.data_manager.banall_list_path
-        )  # UserDataList
-        # get_ban
-        banlist = self.data_manager.read_file(
-            self.data_manager.banlist_path
-        )  # dict[str, UserDataList]
-        group_banned_list = (
-            banlist.get(umo)
-            if isinstance(banlist.get(umo), UserDataList)
-            else UserDataList()
-        )
-        group_banned_str_list = [
-            strings.messages["banlist_strlist_format"].format(
-                user=item.uid,
-                time=time_utils.timelast_format(
-                    (item.time - int(time_module.time())) if item.time != 0 else 0
-                ),
-                reason=item.reason if item.reason else strings.messages["no_reason"],
+            umo_banned_text = (
+                strings.messages["umo_banned_list"] + strings.messages["no_umo_banned"]
             )
-            for item in group_banned_list
-        ]
-        if not group_banned_str_list:
-            group_banned_str_list.append(strings.messages["no_group_banned"])
-        global_banned_str_list = [
-            strings.messages["banlist_strlist_format"].format(
-                user=item.uid,
-                time=time_utils.timelast_format(
-                    (item.time - int(time_module.time())) if item.time != 0 else 0
-                ),
-                reason=item.reason if item.reason else strings.messages["no_reason"],
+            umo_passed_text = (
+                strings.messages["umo_passed_list"] + strings.messages["no_umo_passed"]
             )
-            for item in global_banned_list
-        ]
-        if not global_banned_str_list:
-            global_banned_str_list.append(strings.messages["no_global_banned"])
-        group_passed_str_list = [
-            strings.messages["banlist_strlist_format"].format(
-                user=item.uid,
-                time=time_utils.timelast_format(
-                    (item.time - int(time_module.time())) if item.time != 0 else 0
-                ),
-                reason=item.reason if item.reason else strings.messages["no_reason"],
+        else:
+            # 获取UMO
+            umo = event.unified_msg_origin
+            data: dict[str, dict[str, UserDataList] | BaseModelList] = (
+                self.data_manager.get_data()
             )
-            for item in group_passed_list
-        ]
-        if not group_passed_str_list:
-            group_passed_str_list.append(strings.messages["no_group_passed"])
-        global_passed_str_list = [
-            strings.messages["banlist_strlist_format"].format(
-                user=item.uid,
-                time=time_utils.timelast_format(
-                    (item.time - int(time_module.time())) if item.time != 0 else 0
-                ),
-                reason=item.reason if item.reason else strings.messages["no_reason"],
-            )
-            for item in global_passed_list
-        ]
-        if not global_passed_str_list:
-            global_passed_str_list.append(strings.messages["no_global_passed"])
+            # get_pass
+            try:
+                group_passed_list = data["pass"][umo]
+            except KeyError:
+                group_passed_list = UserDataList()
+            # get_pass-all
+            global_passed_list: UserDataList = data["passall"]
+            # get_ban
+            try:
+                group_banned_list = data["ban"][umo]
+            except KeyError:
+                group_banned_list = UserDataList()
+            # get_ban-all
+            global_banned_list: UserDataList = data["banall"]
+            # get_pass-umo
+            umo_passed_list: UmoDataList = data["umopass"]
+            # get_ban-umo
+            umo_banned_list: UmoDataList = data["umoban"]
 
-        group_banned_text = strings.messages["group_banned_list"] + "".join(
-            group_banned_str_list
-        )
-        global_banned_text = strings.messages["global_banned_list"] + "".join(
-            global_banned_str_list
-        )
-        group_passed_text = strings.messages["group_passed_list"] + "".join(
-            group_passed_str_list
-        )
-        global_passed_text = strings.messages["global_passed_list"] + "".join(
-            global_passed_str_list
-        )
+            # 生成结果
+            group_banned_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.uid,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in group_banned_list
+            ]
+            if not group_banned_str_list:
+                group_banned_str_list.append(strings.messages["no_group_banned"])
 
-        result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}"
+            global_banned_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.uid,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in global_banned_list
+            ]
+            if not global_banned_str_list:
+                global_banned_str_list.append(strings.messages["no_global_banned"])
+
+            group_passed_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.uid,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in group_passed_list
+            ]
+            if not group_passed_str_list:
+                group_passed_str_list.append(strings.messages["no_group_passed"])
+
+            global_passed_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.uid,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in global_passed_list
+            ]
+            if not global_passed_str_list:
+                global_passed_str_list.append(strings.messages["no_global_passed"])
+
+            umo_banned_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.umo,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in umo_banned_list
+            ]
+            if not umo_banned_str_list:
+                umo_banned_str_list.append(strings.messages["no_umo_banned"])
+
+            umo_passed_str_list = [
+                strings.messages["banlist_strlist_format"].format(
+                    id=item.umo,
+                    time=time_utils.timelast_format(
+                        (item.time - int(time_module.time())) if item.time != 0 else 0
+                    ),
+                    reason=item.reason
+                    if item.reason
+                    else strings.messages["no_reason"],
+                )
+                for item in umo_passed_list
+            ]
+            if not umo_passed_str_list:
+                umo_passed_str_list.append(strings.messages["no_umo_passed"])
+
+            group_banned_text = strings.messages["group_banned_list"] + "".join(
+                group_banned_str_list
+            )
+            global_banned_text = strings.messages["global_banned_list"] + "".join(
+                global_banned_str_list
+            )
+            group_passed_text = strings.messages["group_passed_list"] + "".join(
+                group_passed_str_list
+            )
+            global_passed_text = strings.messages["global_passed_list"] + "".join(
+                global_passed_str_list
+            )
+            umo_banned_text = strings.messages["umo_banned_list"] + "".join(
+                umo_banned_str_list
+            )
+            umo_passed_text = strings.messages["umo_passed_list"] + "".join(
+                umo_passed_str_list
+            )
+
+        result = f"{group_banned_text}\n\n{global_banned_text}\n\n{group_passed_text}\n\n{global_passed_text}\n\n{umo_banned_text}\n\n{umo_passed_text}"
         yield event.plain_result(result)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -153,7 +205,7 @@ class ReNeBan(Star):
         self.enable = True
         yield event.plain_result(strings.messages["ban_enabled"])
         logger.warning(
-            f"已临时启用禁用功能(In {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
+            f"已临时启用禁用功能(in {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -165,7 +217,7 @@ class ReNeBan(Star):
         self.enable = False
         yield event.plain_result(strings.messages["ban_disabled"])
         logger.warning(
-            f"已临时禁用禁用功能(In {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
+            f"已临时禁用禁用功能(in {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
 
     @filter.command("ban-help")
@@ -195,77 +247,61 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban", commands_text=strings.commands["ban"]
-                )
-            )
+            yield event.plain_result(strings.command_error("ban"))
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
-        # 我没法了（（（
+        reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
-            if EventUtils.get_event_at(event) == None:
-                ban_uid = banuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                ban_uid = event_at
             else:
-                ban_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                ban_uid = banuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("ban"))
+            return
+        # 准备ban_user
+        banlist: dict[str, UserDataList] = self.data_manager.get_data("ban")
+        group_banned_list: UserDataList = banlist.get(umo, UserDataList())
+
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not group_banned_list.add_time_to_data(
+                ban_uid,
+                update_time,
+                reason,
+            ):
+                new_ban_item = UserDataModel(
+                    uid=ban_uid,
+                    time=(
+                        (int(time_module.time()) + update_time) if time != "0" else 0
+                    ),
+                    reason=reason,
+                )
+                group_banned_list.append(new_ban_item)
+            self.data_manager.write_data("ban", banlist)
+        except PermanentRecordTimeError:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban", commands_text=strings.commands["ban"]
+                strings.messages["time_zeroset_error"].format(command="ban")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        # 准备ban_user
-        self.data_manager.clear_banned()
-        banlist = self.data_manager.read_file(
-            self.data_manager.banlist_path
-        )  # dict[str, UserDataList]
-        if not isinstance(banlist.get(umo), UserDataList):
-            banlist[umo] = UserDataList()
-        group_banned_list = banlist.get(umo)  # UserDataList
-        tempbool = False
-        for item in group_banned_list:
-            if item.uid == ban_uid:
-                if item.time == 0:
-                    yield event.plain_result(
-                        strings.messages["time_zeroset_error"].format(command="ban")
-                    )
-                    return
-                else:
-                    # 更新时间
-                    new_time = (
-                        (item.time + time_utils.timestr_to_int(time))
-                        if time != "0"
-                        else 0
-                    )
-                    item.update_data(time=new_time, reason=reason)
-                    tempbool = True
-                    break
-            else:
-                continue
-        if not tempbool:
-            # 添加新的封禁记录
-            new_ban_item = UserDataModel(
-                uid=ban_uid,
-                time=(int(time_module.time()) + time_utils.timestr_to_int(time))
-                if time != "0"
-                else 0,
-                reason=reason,
-            )
-            group_banned_list.append(new_ban_item)
-        logger.warning(
-            f"[ban]{json.dumps([{k: [dict(item) for item in v] for k, v in banlist.items()}], indent=4, ensure_ascii=False)}"
-        )
-        self.data_manager.write_file(self.data_manager.banlist_path, banlist)
+
         yield event.plain_result(
             strings.messages["banned_user"].format(
-                umo=umo, user=ban_uid, time=time_utils.time_format(time), reason=reason
+                umo=umo,
+                user=ban_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
             )
         )
 
@@ -288,69 +324,54 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban-all", commands_text=strings.commands["ban-all"]
-                )
-            )
+            yield event.plain_result(strings.command_error("ban-all"))
             return
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
-            if EventUtils.get_event_at(event) == None:
-                ban_uid = banuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                ban_uid = event_at
             else:
-                ban_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                ban_uid = banuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("ban-all"))
+            return
+        banall_list: UserDataList = self.data_manager.get_data("banall")
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not banall_list.add_time_to_data(
+                ban_uid,
+                update_time,
+                reason,
+            ):
+                new_ban_item = UserDataModel(
+                    uid=ban_uid,
+                    time=(
+                        (int(time_module.time()) + update_time) if time != "0" else 0
+                    ),
+                    reason=reason,
+                )
+                banall_list.append(new_ban_item)
+            self.data_manager.write_data("banall", banall_list)
+        except PermanentRecordTimeError:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban-all", commands_text=strings.commands["ban-all"]
+                strings.messages["time_zeroset_error"].format(command="ban-all")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        banall_list = self.data_manager.read_file(
-            self.data_manager.banall_list_path
-        )  # UserDataList
-        tempbool = False
-        for item in banall_list:
-            if item.uid == ban_uid:
-                if item.time == 0:
-                    yield event.plain_result(
-                        strings.messages["time_zeroset_error"].format(command="ban-all")
-                    )
-                    return
-                else:
-                    # 更新时间
-                    new_time = (
-                        (item.time + time_utils.timestr_to_int(time))
-                        if time != "0"
-                        else 0
-                    )
-                    item.update_data(time=new_time, reason=reason)
-                    tempbool = True
-                    break
-            else:
-                continue
-        if not tempbool:
-            # 添加新的全局封禁记录
-            new_ban_item = UserDataModel(
-                uid=ban_uid,
-                time=(int(time_module.time()) + time_utils.timestr_to_int(time))
-                if time != "0"
-                else 0,
-                reason=reason,
-            )
-            banall_list.append(new_ban_item)
-        logger.warning(
-            f"[ban-all]{json.dumps([dict(item) for item in banall_list], indent=4, ensure_ascii=False)}"
-        )
-        self.data_manager.write_file(self.data_manager.banall_list_path, banall_list)
+
         yield event.plain_result(
             strings.messages["banned_user_global"].format(
-                user=ban_uid, time=time_utils.time_format(time), reason=reason
+                user=ban_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
             )
         )
 
@@ -374,72 +395,60 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="pass", commands_text=strings.commands["pass"]
-                )
-            )
+            yield event.plain_result(strings.command_error("pass"))
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
-            if EventUtils.get_event_at(event) == None:
-                pass_uid = passuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                pass_uid = event_at
             else:
-                pass_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                pass_uid = passuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("pass"))
+            return
+        passlist: dict[str, UserDataList] = self.data_manager.get_data("pass")
+        group_passed_list: UserDataList = passlist.get(umo, UserDataList())
+
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not group_passed_list.add_time_to_data(
+                pass_uid,
+                update_time,
+                reason,
+            ):
+                new_pass_item = UserDataModel(
+                    uid=pass_uid,
+                    time=(
+                        (int(time_module.time()) + update_time) if time != "0" else 0
+                    ),
+                    reason=reason,
+                )
+                group_passed_list.append(new_pass_item)
+            self.data_manager.write_data("pass", passlist)
+        except PermanentRecordTimeError:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="pass", commands_text=strings.commands["pass"]
+                strings.messages["time_zeroset_error"].format(command="pass")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        passlist = self.data_manager.read_file(
-            self.data_manager.passlist_path
-        )  # dict[str, UserDataList]
-        if not isinstance(passlist.get(umo), UserDataList):
-            passlist[umo] = UserDataList()
-        group_passed_list = passlist.get(umo)  # UserDataList
-        tempbool = False
-        for item in group_passed_list:
-            if item.uid == pass_uid:
-                if item.time == 0:
-                    yield event.plain_result(
-                        strings.messages["time_zeroset_error"].format(command="pass")
-                    )
-                    return
-                else:
-                    # 更新时间
-                    new_time = (
-                        (item.time + time_utils.timestr_to_int(time))
-                        if time != "0"
-                        else 0
-                    )
-                    item.update_data(time=new_time, reason=reason)
-                    tempbool = True
-                    break
-            else:
-                continue
-        if not tempbool:
-            # 添加新的解限记录
-            new_pass_item = UserDataModel(
-                uid=pass_uid,
-                time=(int(time_module.time()) + time_utils.timestr_to_int(time))
-                if time != "0"
-                else 0,
-                reason=reason,
-            )
-            group_passed_list.append(new_pass_item)
-        self.data_manager.write_file(self.data_manager.passlist_path, passlist)
+
         yield event.plain_result(
             strings.messages["passed_user"].format(
-                umo=umo, user=pass_uid, time=time_utils.time_format(time), reason=reason
+                umo=umo,
+                user=pass_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
             )
         )
 
@@ -462,68 +471,54 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="pass-all", commands_text=strings.commands["pass-all"]
-                )
-            )
+            yield event.plain_result(strings.command_error("pass-all"))
             return
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
-            if EventUtils.get_event_at(event) == None:
-                pass_uid = passuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                pass_uid = event_at
             else:
-                pass_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                pass_uid = passuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("pass-all"))
+            return
+        passall_list: UserDataList = self.data_manager.get_data("passall")
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not passall_list.add_time_to_data(
+                pass_uid,
+                update_time,
+                reason,
+            ):
+                new_pass_item = UserDataModel(
+                    uid=pass_uid,
+                    time=(
+                        (int(time_module.time()) + update_time) if time != "0" else 0
+                    ),
+                    reason=reason,
+                )
+                passall_list.append(new_pass_item)
+            self.data_manager.write_data("passall", passall_list)
+        except PermanentRecordTimeError:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="pass-all", commands_text=strings.commands["pass-all"]
+                strings.messages["time_zeroset_error"].format(command="pass-all")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        passall_list = self.data_manager.read_file(
-            self.data_manager.passall_list_path
-        )  # UserDataList
-        tempbool = False
-        for item in passall_list:
-            if item.uid == pass_uid:
-                if item.time == 0:
-                    yield event.plain_result(
-                        strings.messages["time_zeroset_error"].format(
-                            command="pass-all"
-                        )
-                    )
-                    return
-                else:
-                    # 更新时间
-                    new_time = (
-                        (item.time + time_utils.timestr_to_int(time))
-                        if time != "0"
-                        else 0
-                    )
-                    item.update_data(time=new_time, reason=reason)
-                    tempbool = True
-                    break
-            else:
-                continue
-        if not tempbool:
-            # 添加新的全局解限记录
-            new_pass_item = UserDataModel(
-                uid=pass_uid,
-                time=(int(time_module.time()) + time_utils.timestr_to_int(time))
-                if time != "0"
-                else 0,
-                reason=reason,
-            )
-            passall_list.append(new_pass_item)
-        self.data_manager.write_file(self.data_manager.passall_list_path, passall_list)
+
         yield event.plain_result(
             strings.messages["passed_user_global"].format(
-                user=pass_uid, time=time_utils.time_format(time), reason=reason
+                user=pass_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
             )
         )
 
@@ -547,74 +542,53 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-pass", commands_text=strings.commands["dec-pass"]
-                )
-            )
+            yield event.plain_result(strings.command_error("dec-pass"))
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
-            if EventUtils.get_event_at(event) == None:
-                pass_uid = passuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                pass_uid = event_at
             else:
-                pass_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                pass_uid = passuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("dec-pass"))
+            return
+        pass_list: dict[str, UserDataList] = self.data_manager.get_data("pass")
+        group_passed_list: UserDataList = pass_list.get(umo, UserDataList())
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not group_passed_list.subtract_time_from_data(
+                pass_uid,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("pass", pass_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-pass", commands_text=strings.commands["dec-pass"]
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        passlist = self.data_manager.read_file(
-            self.data_manager.passlist_path
-        )  # dict[str, UserDataList]
-        group_passed_list = passlist.get(umo)  # UserDataList
-        if not isinstance(group_passed_list, UserDataList):
-            yield event.plain_result(strings.messages["dec_no_record"])
-            return
-        for item in group_passed_list:
-            if item.uid == pass_uid:
-                if time == "0":
-                    group_passed_list.remove(item)
-                    self.data_manager.write_file(
-                        self.data_manager.passlist_path, passlist
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_passed_user"].format(
-                            umo=umo,
-                            user=pass_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-                if item.time == 0:
-                    yield event.plain_result(strings.messages["dec_zerotime_error"])
-                    return
-                else:
-                    new_time = item.time - time_utils.timestr_to_int(time)
-                    item.update_data(time=new_time, reason=reason)
-                    self.data_manager.write_file(
-                        self.data_manager.passlist_path, passlist
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_passed_user"].format(
-                            umo=umo,
-                            user=pass_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-        yield event.plain_result(strings.messages["dec_no_record"])
+
+        yield event.plain_result(
+            strings.messages["dec_passed_user"].format(
+                umo=umo,
+                user=pass_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-pass-all")
@@ -635,64 +609,48 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-pass-all",
-                    commands_text=strings.commands["dec-pass-all"],
-                )
-            )
+            yield event.plain_result(strings.command_error("dec-pass-all"))
             return
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
-            if EventUtils.get_event_at(event) == None:
-                pass_uid = passuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                pass_uid = event_at
             else:
-                pass_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                pass_uid = passuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("dec-pass-all"))
+            return
+        passall_list: UserDataList = self.data_manager.get_data("passall")
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not passall_list.subtract_time_from_data(
+                pass_uid,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("passall", passall_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-pass-all",
-                    commands_text=strings.commands["dec-pass-all"],
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        passall_list = self.data_manager.read_file(
-            self.data_manager.passall_list_path
-        )  # UserDataList
-        for item in passall_list:
-            if item.uid == pass_uid:
-                if time == "0":
-                    passall_list.remove(item)
-                    self.data_manager.write_file(
-                        self.data_manager.passall_list_path, passall_list
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_passed_user_global"].format(
-                            user=pass_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-                else:
-                    new_time = item.time - time_utils.timestr_to_int(time)
-                    item.update_data(time=new_time, reason=reason)
-                    self.data_manager.write_file(
-                        self.data_manager.passall_list_path, passall_list
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_passed_user_global"].format(
-                            user=pass_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-        yield event.plain_result(strings.messages["dec_no_record"])
+
+        yield event.plain_result(
+            strings.messages["dec_passed_user_global"].format(
+                user=pass_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-ban")
@@ -714,74 +672,53 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-ban", commands_text=strings.commands["dec-ban"]
-                )
-            )
+            yield event.plain_result(strings.command_error("dec-ban"))
             return
         if umo == None:
             # 若umo不存在，则使用event.unified_msg_origin（当前群）
             umo = event.unified_msg_origin
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
-            if EventUtils.get_event_at(event) == None:
-                ban_uid = banuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                ban_uid = event_at
             else:
-                ban_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                ban_uid = banuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("dec-ban"))
+            return
+        ban_list: dict[str, UserDataList] = self.data_manager.get_data("ban")
+        group_banned_list: UserDataList = ban_list.get(umo, UserDataList())
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not group_banned_list.subtract_time_from_data(
+                ban_uid,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("ban", ban_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-ban", commands_text=strings.commands["dec-ban"]
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        banlist = self.data_manager.read_file(
-            self.data_manager.banlist_path
-        )  # dict[str, UserDataList]
-        group_banned_list = banlist.get(umo)  # UserDataList
-        if not isinstance(group_banned_list, UserDataList):
-            yield event.plain_result(strings.messages["dec_no_record"])
-            return
-        for item in group_banned_list:
-            if item.uid == ban_uid:
-                if time == "0":
-                    group_banned_list.remove(item)
-                    self.data_manager.write_file(
-                        self.data_manager.banlist_path, banlist
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_banned_user"].format(
-                            umo=umo,
-                            user=ban_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-                if item.time == 0:
-                    yield event.plain_result(strings.messages["dec_zerotime_error"])
-                    return
-                else:
-                    new_time = item.time - time_utils.timestr_to_int(time)
-                    item.update_data(time=new_time, reason=reason)
-                    self.data_manager.write_file(
-                        self.data_manager.banlist_path, banlist
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_banned_user"].format(
-                            umo=umo,
-                            user=ban_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-        yield event.plain_result(strings.messages["dec_no_record"])
+
+        yield event.plain_result(
+            strings.messages["dec_banned_user"].format(
+                user=ban_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+                umo=umo,
+            )
+        )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("dec-ban-all")
@@ -802,65 +739,48 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-ban-all", commands_text=strings.commands["dec-ban-all"]
-                )
-            )
+            yield event.plain_result(strings.command_error("dec-ban-all"))
             return
-        if reason in strings.no_reason:
-            # 若reason在no_reason中，则reason为None（无理由）
-            reason = None
+        reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
-            if EventUtils.get_event_at(event) == None:
-                ban_uid = banuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                ban_uid = event_at
             else:
-                ban_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
+                ban_uid = banuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("dec-ban-all"))
+            return
+        banall_list: UserDataList = self.data_manager.get_data("banall")
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not banall_list.subtract_time_from_data(
+                ban_uid,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("banall", banall_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
             yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="dec-ban-all", commands_text=strings.commands["dec-ban-all"]
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
                 )
             )
             return
-        self.data_manager.clear_banned()
-        banall_list = self.data_manager.read_file(
-            self.data_manager.banall_list_path
-        )  # UserDataList
-        for item in banall_list:
-            if item.uid == ban_uid:
-                if time == "0":
-                    banall_list.remove(item)
-                    self.data_manager.write_file(
-                        self.data_manager.banall_list_path, banall_list
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_banned_user_global"].format(
-                            user=ban_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-                if item.time == 0:
-                    yield event.plain_result(strings.messages["dec_zerotime_error"])
-                    return
-                else:
-                    new_time = item.time - time_utils.timestr_to_int(time)
-                    item.update_data(time=new_time, reason=reason)
-                    self.data_manager.write_file(
-                        self.data_manager.banall_list_path, banall_list
-                    )
-                    yield event.plain_result(
-                        strings.messages["dec_banned_user_global"].format(
-                            user=ban_uid,
-                            time=time_utils.time_format(time),
-                            reason=reason,
-                        )
-                    )
-                    return
-        yield event.plain_result(strings.messages["dec_no_record"])
+
+        yield event.plain_result(
+            strings.messages["dec_banned_user_global"].format(
+                user=ban_uid,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban-reset")
@@ -875,78 +795,42 @@ class ReNeBan(Star):
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban-reset", commands_text=strings.commands["ban-reset"]
-                )
-            )
+            yield event.plain_result(strings.command_error("ban-reset"))
             return
         try:
             reset_uid: str
-            if EventUtils.get_event_at(event) is None:
-                reset_uid = resetuser
+            event_at: str | None = EventUtils.get_event_at(event)
+            if event_at:
+                reset_uid = event_at
             else:
-                reset_uid = EventUtils.get_event_at(event)  # type: ignore
-        except AtNumberError:
-            yield event.plain_result(
-                strings.messages["command_error"].format(
-                    command="ban-reset", commands_text=strings.commands["ban-reset"]
-                )
-            )
+                reset_uid = resetuser
+        except AtUserCountError:
+            yield event.plain_result(strings.command_error("ban-reset"))
             return
-        self.data_manager.clear_banned()
 
-        banall_data = self.data_manager.read_file(
-            self.data_manager.banall_list_path
-        )  # UserDataList
-        passall_data = self.data_manager.read_file(
-            self.data_manager.passall_list_path
-        )  # UserDataList
-        ban_data = self.data_manager.read_file(
-            self.data_manager.banlist_path
-        )  # dict[str, UserDataList]
-        pass_data = self.data_manager.read_file(
-            self.data_manager.passlist_path
-        )  # dict[str, UserDataList]
-        # 从全局封禁列表中移除该用户
-        banall_data = UserDataList(
-            [item for item in banall_data if item.uid != reset_uid]
+        user_datas: dict[str, dict[str, UserDataList] | BaseModelList] = (
+            self.data_manager.get_data(["ban", "pass", "banall", "passall"])
         )
-        # 从全局解封列表中移除该用户
-        passall_data = UserDataList(
-            [item for item in passall_data if item.uid != reset_uid]
-        )
-        # 从各UMO的封禁列表中移除该用户
-        for umo in list(ban_data.keys()):
-            ban_data[umo] = UserDataList(
-                [item for item in ban_data[umo] if item.uid != reset_uid]
-            )
-        # 从各UMO的解封列表中移除该用户
-        for umo in list(pass_data.keys()):
-            pass_data[umo] = UserDataList(
-                [item for item in pass_data[umo] if item.uid != reset_uid]
-            )
-        # 将修改后的数据写回文件
-        self.data_manager.write_file(self.data_manager.banall_list_path, banall_data)
-        self.data_manager.write_file(self.data_manager.passall_list_path, passall_data)
-        self.data_manager.write_file(self.data_manager.banlist_path, ban_data)
-        self.data_manager.write_file(self.data_manager.passlist_path, pass_data)
+        for umo in list(user_datas["ban"].keys()):
+            user_datas["ban"][umo].remove_by_id(reset_uid)
+        for umo in list(user_datas["pass"].keys()):
+            user_datas["pass"][umo].remove_by_id(reset_uid)
+        user_datas["banall"].remove_by_id(reset_uid)
+        user_datas["passall"].remove_by_id(reset_uid)
+        self.data_manager.write_data(list(user_datas.keys()), list(user_datas.values()))
 
         yield event.plain_result(
             strings.messages["ban_reset_success"].format(user=reset_uid)
         )
 
-    # 设置优先级，可在其他未设置优先级（priority=0）的命令/监听器/钩子前过滤
-    @filter.event_message_type(filter.EventMessageType.ALL, priority=1)
+    # 设置优先级，可在其他低优先级（priority<114）的命令/监听器/钩子前过滤
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=114)
     async def filter_banned_users(self, event: AstrMessageEvent):
         """
         全局事件过滤器：
         如果禁用功能启用且发送者被禁用，则停止事件传播，机器人不再响应该用户的消息。
         """
-        if (
-            self.enable
-            and EventUtils.is_banned(self.enable, self.data_manager, event)[0]
-        ):
+        if EventUtils.is_banned(self.enable, self.data_manager, event)[0]:
             event.stop_event()
 
     async def terminate(self):
