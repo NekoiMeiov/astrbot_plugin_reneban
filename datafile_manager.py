@@ -471,7 +471,7 @@ class DatafileManager:
         self,
         no_return: Literal[True],
         need_data: list[str] | None = None,
-        have_data: dict[str, dict[str, UserDataList] | BaseModelList] = {},
+        have_data: dict[str, dict[str, UserDataList] | BaseModelList] | None = None,
         no_copy: bool = False,
     ) -> None: ...
 
@@ -480,12 +480,12 @@ class DatafileManager:
         self,
         no_return: Literal[False] = False,
         need_data: list[str] | None = None,
-        have_data: dict[str, dict[str, UserDataList] | BaseModelList] = {},
+        have_data: dict[str, dict[str, UserDataList] | BaseModelList] | None = None,
         no_copy: bool = False,
     ) -> dict[str, dict[str, UserDataList] | BaseModelList]: ...
 
     def sync_and_clean_data(
-        self, no_return=False, need_data=None, have_data={}, no_copy=False
+        self, no_return=False, need_data=None, have_data=None, no_copy=False
     ) -> dict[str, dict[str, UserDataList] | BaseModelList] | None:
         """
         清洗数据并同步至磁盘
@@ -504,6 +504,10 @@ class DatafileManager:
             # 提交置空
             self._commits = {}
             # 取数据（优先从 have_data 获取）
+            # 将 None 初始化为空字典（因为我懒得加 if 了）
+            have_data: dict[str, dict[str, UserDataList] | BaseModelList] = (
+                {} if have_data is None else have_data
+            )
             banall_data: UserDataList = (
                 copy.deepcopy(have_data["banall"])
                 if "banall" in have_data
