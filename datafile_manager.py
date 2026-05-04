@@ -200,7 +200,7 @@ class DatafileManager:
                 result[key] = UserDataList(
                     [
                         UserDataModel(
-                            id_value=item["uid"],
+                            uid=item["uid"],
                             time=item["time"],
                             reason=item.get("reason"),
                         )
@@ -222,7 +222,7 @@ class DatafileManager:
             return UserDataList(
                 [
                     UserDataModel(
-                        id_value=item["uid"],
+                        uid=item["uid"],
                         time=item["time"],
                         reason=item.get("reason"),
                     )
@@ -243,7 +243,7 @@ class DatafileManager:
             return UmoDataList(
                 [
                     UmoDataModel(
-                        id_value=item["umo"],
+                        umo=item["umo"],
                         time=item["time"],
                         reason=item.get("reason"),
                     )
@@ -436,6 +436,7 @@ class DatafileManager:
                     umopass_time_map[ban_item.umo] < ban_item.time
                     and umopass_time_map[ban_item.umo] != 0
                 )
+                or (ban_item.time == 0 and umopass_time_map[ban_item.umo] != 0)
             ]
         )
 
@@ -456,7 +457,7 @@ class DatafileManager:
             # 在umoban_data不为空的情况下，clear不执行
             combined_ban_uids: set[str] = banall_uids
             for umo in list(pass_data.keys()):
-                combined_ban_uids.update(item.uid for item in ban_data[umo])
+                combined_ban_uids.update(item.uid for item in ban_data.get(umo, UserDataList()))
                 pass_data[umo] = UserDataList(
                     [item for item in pass_data[umo] if item.uid in combined_ban_uids]
                 )

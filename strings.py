@@ -35,7 +35,7 @@ commands = {
     "dec-pass": "/dec-pass <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
     "dec-ban-all": "/dec-ban-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
     "dec-pass-all": "/dec-pass-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-    "ban-reset": "/ban-reset",
+    "ban-reset": "/ban-reset <@用户|UID（QQ号）>",
 }
 # 默认输出文案
 messages = {

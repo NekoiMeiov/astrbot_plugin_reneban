@@ -21,7 +21,7 @@ class _ModelListRegistry:
     """
 
     def __init__(self):
-        self._lists: weakref.WeakSet["BaseModelList"] = weakref.WeakSet()
+        self._lists: weakref.WeakValueDictionary[int, "BaseModelList"] = weakref.WeakValueDictionary()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread = threading.Thread(
@@ -32,25 +32,24 @@ class _ModelListRegistry:
     def register(self, lst: "BaseModelList") -> None:
         """注册一个 BaseModelList 到清理任务"""
         with self._lock:
-            self._lists.add(lst)
+            self._lists[id(lst)] = lst
 
     def _clear_loop(self) -> None:
         """后台清理任务循环，每秒扫描所有注册的列表"""
         while not self._stop_event.is_set():
             # 在锁外获取快照，避免持有锁时遍历耗时
             with self._lock:
-                snapshots = list(self._lists)
+                snapshots = list(self._lists.values())
             for lst in snapshots:
                 with lst._lock:
-                    lst[:] = [
+                    rm_lst = [
                         item
                         for item in lst
-                        if item.time == 0 or item.time > time_module.time()
+                        if item.time != 0 and item.time < time_module.time()
                     ]
-                    lst._ids: set[str] = {item._get_id_field_value() for item in lst}
-            snapshots = []
+                    for item in rm_lst:
+                        lst.remove(item)
             self._stop_event.wait(1)
-
 
 _MODEL_LIST_REGISTRY = _ModelListRegistry()
 
@@ -114,7 +113,7 @@ class BaseDataModel(MutableMapping):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return dict(self.items()) == dict(other.items())
+        return object.__getattribute__(self, "_data") == object.__getattribute__(other, "_data")
 
     def __copy__(self):
         return self.__class__(
@@ -124,7 +123,7 @@ class BaseDataModel(MutableMapping):
             reason=self.reason,
         )
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo):
         return copy.copy(self)
 
     def _get_id_field_name(self) -> str:
@@ -193,6 +192,8 @@ class BaseModelList(list):
             self.extend(iterable)
 
     def __setitem__(self, key, value):
+        if isinstance(key, slice):
+            raise TypeError(f"{self.__class__.__name__} does not support slice assignment.")
         with self._lock:
             if not isinstance(value, self.model_class):
                 raise TypeError(
@@ -201,8 +202,7 @@ class BaseModelList(list):
 
             if value._get_id_field_value() in self._ids:
                 self.remove_by_id(value._get_id_field_value())
-            else:
-                self._ids.add(value._get_id_field_value())
+            self._ids.add(value._get_id_field_value())
             super().__setitem__(key, value)
 
     def __delitem__(self, key):
@@ -213,7 +213,7 @@ class BaseModelList(list):
     def __copy__(self):
         return self.__class__(model_class=self.model_class, iterable=self)
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo):
         return self.__class__(
             model_class=self.model_class, iterable=[copy.copy(m) for m in self]
         )
@@ -299,12 +299,12 @@ class BaseModelList(list):
 class UserDataModel(BaseDataModel):
     """用户数据模型，继承自 BaseDataModel，使用 uid 作为主键"""
 
-    def __init__(self, id_value: str, time: int, reason: str | None = None):
-        super().__init__(id_field="uid", id_value=id_value, time=time, reason=reason)
+    def __init__(self, uid: str, time: int, reason: str | None = None):
+        super().__init__(id_field="uid", id_value=uid, time=time, reason=reason)
 
     def __copy__(self):
         return self.__class__(
-            id_value=self._get_id_field_value(),
+            uid=self._get_id_field_value(),
             time=self.time,
             reason=self.reason,
         )
@@ -316,23 +316,33 @@ class UserDataList(BaseModelList):
     def __init__(self, iterable: list | None = None):
         super().__init__(model_class=UserDataModel, iterable=iterable)
 
+    def __copy__(self):
+        return self.__class__(iterable=self)
+
+    def __deepcopy__(self, memo):
+        return self.__class__(iterable=[copy.copy(m) for m in self])
 
 class UmoDataModel(BaseDataModel):
     """用户数据模型，继承自 BaseDataModel，使用 umo 作为主键"""
 
-    def __init__(self, id_value: str, time: int, reason: str | None = None):
-        super().__init__(id_field="umo", id_value=id_value, time=time, reason=reason)
+    def __init__(self, umo: str, time: int, reason: str | None = None):
+        super().__init__(id_field="umo", id_value=umo, time=time, reason=reason)
 
     def __copy__(self):
         return self.__class__(
-            id_value=self._get_id_field_value(),
+            umo=self._get_id_field_value(),
             time=self.time,
             reason=self.reason,
         )
-
 
 class UmoDataList(BaseModelList):
     """用户数据列表，继承自 BaseModelList，使用 umo 作为主键"""
 
     def __init__(self, iterable: list | None = None):
         super().__init__(model_class=UmoDataModel, iterable=iterable)
+
+    def __copy__(self):
+        return self.__class__(iterable=self)
+
+    def __deepcopy__(self, memo):
+        return self.__class__(iterable=[copy.copy(m) for m in self])
