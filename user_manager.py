@@ -52,7 +52,7 @@ class _ModelListRegistry:
             self._stop_event.wait(1)
 
 
-__MODEL_LIST_REGISTRY = _ModelListRegistry()
+_MODEL_LIST_REGISTRY = _ModelListRegistry()
 
 
 class BaseDataModel(MutableMapping):
@@ -188,7 +188,7 @@ class BaseModelList(list):
         self.model_class = model_class
         self._ids: set[str] = set()
         self._lock = threading.RLock()
-        __MODEL_LIST_REGISTRY.register(self)
+        _MODEL_LIST_REGISTRY.register(self)
         if iterable:
             self.extend(iterable)
 
