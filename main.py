@@ -265,7 +265,9 @@ class ReNeBan(Star):
             return
         # 准备ban_user
         banlist: dict[str, UserDataList] = self.data_manager.get_data("ban")
-        group_banned_list: UserDataList = banlist.get(umo, UserDataList())
+        if banlist.get(umo) is None:
+            banlist[umo] = UserDataList()
+        group_banned_list: UserDataList = banlist.get(umo)
 
         try:
             update_time: int = time_utils.timestr_to_int(time)
@@ -412,7 +414,9 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("pass"))
             return
         passlist: dict[str, UserDataList] = self.data_manager.get_data("pass")
-        group_passed_list: UserDataList = passlist.get(umo, UserDataList())
+        if passlist.get(umo) is None:
+            passlist[umo] = UserDataList()
+        group_passed_list: UserDataList = passlist.get(umo)
 
         try:
             update_time: int = time_utils.timestr_to_int(time)

@@ -64,17 +64,31 @@ class DatafileManager:
         self._cache_timestamp: int = 0  # 缓存创建时间戳
         self._cache_ttl: int = cache_ttl  # 缓存存活时间（秒）
 
+        # 初始化文件
+        self._initialize_files()
+
         if self._WAL_path.exists() and self._WAL_ready_path.exists():
             # 崩溃重放
             self._WAL_write(False)
 
         self.sync_and_clean_data(no_return=True)
 
-        # 初始化文件
-        self._initialize_files()
-
     def _initialize_files(self):
         """初始化所有数据文件"""
+        # 迁移：旧版 passlist.json -> 新版 pass_list.json，banlist同理
+        old_passlist = self.data_dir / "passlist.json"
+        old_banlist = self.data_dir / "banlist.json"
+        if (
+            old_passlist.exists()
+            and not (self.data_dir / self.passlist_filename).exists()
+        ):
+            old_passlist.rename(self.data_dir / self.passlist_filename)
+        if (
+            old_banlist.exists()
+            and not (self.data_dir / self.banlist_filename).exists()
+        ):
+            old_banlist.rename(self.data_dir / self.banlist_filename)
+
         # 这些文件是字典结构，应初始化为空字典
         for path in [
             self.data_dir / self.passlist_filename,
@@ -490,24 +504,40 @@ class DatafileManager:
             # 提交置空
             self._commits = {}
             # 取数据（优先从 have_data 获取）
-            banall_data: UserDataList = copy.deepcopy(
-                have_data.get("banall")
-            ) or self._read_file(self.banall_list_filename)
-            passall_data: UserDataList = copy.deepcopy(
-                have_data.get("passall")
-            ) or self._read_file(self.passall_list_filename)
-            ban_data: dict[str, UserDataList] = copy.deepcopy(
-                have_data.get("ban")
-            ) or self._read_file(self.banlist_filename)
-            pass_data: dict[str, UserDataList] = copy.deepcopy(
-                have_data.get("pass")
-            ) or self._read_file(self.passlist_filename)
-            umoban_data: UmoDataList = copy.deepcopy(
-                have_data.get("umoban")
-            ) or self._read_file(self.umo_ban_list_filename)
-            umopass_data: UmoDataList = copy.deepcopy(
-                have_data.get("umopass")
-            ) or self._read_file(self.umo_pass_list_filename)
+            banall_data: UserDataList = (
+                copy.deepcopy(have_data["banall"])
+                if "banall" in have_data
+                and isinstance(have_data["banall"], UserDataList)
+                else self._read_file(self.banall_list_filename)
+            )
+            passall_data: UserDataList = (
+                copy.deepcopy(have_data["passall"])
+                if "passall" in have_data
+                and isinstance(have_data["passall"], UserDataList)
+                else self._read_file(self.passall_list_filename)
+            )
+            ban_data: dict[str, UserDataList] = (
+                copy.deepcopy(have_data["ban"])
+                if "ban" in have_data and isinstance(have_data["ban"], dict)
+                else self._read_file(self.banlist_filename)
+            )
+            pass_data: dict[str, UserDataList] = (
+                copy.deepcopy(have_data["pass"])
+                if "pass" in have_data and isinstance(have_data["pass"], dict)
+                else self._read_file(self.passlist_filename)
+            )
+            umoban_data: UmoDataList = (
+                copy.deepcopy(have_data["umoban"])
+                if "umoban" in have_data
+                and isinstance(have_data["umoban"], UmoDataList)
+                else self._read_file(self.umo_ban_list_filename)
+            )
+            umopass_data: UmoDataList = (
+                copy.deepcopy(have_data["umopass"])
+                if "umopass" in have_data
+                and isinstance(have_data["umopass"], UmoDataList)
+                else self._read_file(self.umo_pass_list_filename)
+            )
 
             # 开始清理
             (

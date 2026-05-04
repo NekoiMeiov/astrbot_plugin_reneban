@@ -47,6 +47,7 @@ class _ModelListRegistry:
                         for item in lst
                         if item.time == 0 or item.time > time_module.time()
                     ]
+                    lst._ids: set[str] = {item._get_id_field_value() for item in lst}
             snapshots = []
             self._stop_event.wait(1)
 
