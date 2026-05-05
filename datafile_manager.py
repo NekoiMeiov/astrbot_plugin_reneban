@@ -661,7 +661,7 @@ class DatafileManager:
                 key: copy.deepcopy(value) for key, value in full_data.items()
             }
         if isinstance(data_name, str):
-            return full_data.get(data_name, full_data)
+            return full_data[data_name]
         elif data_name and all(key in full_data for key in data_name):
             return {key: full_data[key] for key in data_name}
         return full_data

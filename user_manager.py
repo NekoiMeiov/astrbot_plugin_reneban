@@ -183,8 +183,18 @@ class BaseModelList(list):
     """
     基础模型列表，提供通用的列表管理功能
     注意：
-        此类虽继承 list 类，但使用此类未重写的方法可能会导致一些问题
+        此类虽继承 list 类，但并未重写所有增删改方法，使用此类未重写的方法可能会导致一些问题
         请注意不要使用此类未重写的 list 方法
+        若您需要用到未重写的方法，请：
+            1. 自行维护 _ids 变量
+            2. 新建Issue
+            3. 新建Pull Request
+        当前可用的已重写方法：
+            - __setitem__
+            - __delitem__
+            - remove
+            - append
+            - extend
     """
 
     def __init__(self, model_class: type[BaseDataModel], iterable: list | None = None):
