@@ -221,10 +221,11 @@ class BaseModelList(list):
                     f"{self.__class__.__name__} can only hold instances of {self.model_class.__name__}, but {type(value)} was passed in."
                 )
 
-            if value._get_id_field_value() in self._ids:
-                self.remove_by_id(value._get_id_field_value())
+            rm_item = self.find_by_id(value._get_id_field_value(), no_copy=True)
             self._ids.add(value._get_id_field_value())
             super().__setitem__(key, value)
+            if rm_item is not None:
+                super().remove(rm_item)
 
     def __delitem__(self, key):
         with self._lock:
