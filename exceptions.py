@@ -48,9 +48,3 @@ class PermanentRecordTimeSubtractionError(PermanentRecordTimeError):
     """
 
     pass
-
-
-class WALFileExistsError(RuntimeError):
-    """WAL 文件已存在（使用 DatafileManager 的 _write_commits() 方法时，如果 WAL 相关文件存在，会抛出此错误）"""
-
-    pass

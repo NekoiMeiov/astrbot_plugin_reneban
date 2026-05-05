@@ -28,10 +28,10 @@ ReNeBan 的指令优先级策略为：`会话 > 全局`，`pass > ban`。
 | `/ban-disable` | /ban-disable | 禁用禁用功能，重启后失效 | /ban-disable |
 | `/banlist` | /banlist | 输出在**当前会话**与**全局**范围下的**禁用/解禁**情况（包括**UID/剩余时长/理由**） | /banlist |
 | `/ban-help` | /ban-help | 输出简易帮助信息 | /ban-help |
-| `/dec-ban` | /dec-ban <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的禁用记录时间 | /dec-ban @UserA 0 表现良好 |
-| `/dec-pass` | /dec-pass <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的解禁记录时间 | /dec-pass @UserB 0 None |
-| `/dec-ban-all` | /dec-ban-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的禁用记录时间 | /dec-ban-all 3869541370 1d30m 表现良好 |
-| `/dec-pass-all` | /dec-pass-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的解禁记录时间 | /dec-pass-all @XYZ 0 NULL |
+| `/dec-ban` | /dec-ban <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的禁用时长 | /dec-ban @UserA 0 表现良好 |
+| `/dec-pass` | /dec-pass <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO] | 删除在**指定会话**范围内对**一名指定用户**的解禁时长 | /dec-pass @UserB 0 None |
+| `/dec-ban-all` | /dec-ban-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的禁用时长 | /dec-ban-all 3869541370 1d30m 表现良好 |
+| `/dec-pass-all` | /dec-pass-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的解禁时长 | /dec-pass-all @XYZ 0 NULL |
 | `/ban-reset` | /ban-reset <@用户\|UID（QQ号）> | 删除**一名指定用户**的**所有**记录 | /ban-reset @NekoiMeiov |
 
 时间字段支持如下格式：

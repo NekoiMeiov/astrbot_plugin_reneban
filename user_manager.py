@@ -180,7 +180,12 @@ class BaseDataModel(MutableMapping):
 
 
 class BaseModelList(list):
-    """基础模型列表，提供通用的列表管理功能"""
+    """
+    基础模型列表，提供通用的列表管理功能
+    注意：
+        此类虽继承 list 类，但使用此类未重写的方法可能会导致一些问题
+        请注意不要使用此类未重写的 list 方法
+    """
 
     def __init__(self, model_class: type[BaseDataModel], iterable: list | None = None):
         super().__init__()

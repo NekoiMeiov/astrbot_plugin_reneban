@@ -18,7 +18,6 @@ from .user_manager import (
     BaseDataModel,
     BaseModelList,
 )
-from .exceptions import WALFileExistsError
 
 from astrbot.api import logger
 
@@ -153,7 +152,7 @@ class DatafileManager:
 
     def _safe_pathjoin(self, dir_path: Path, filename: str) -> Path:
         """
-        在 filename 可能来源于外部输入时，安全的是拼接的路径在 dir_path 内（不支持跨出 dir_path 目录的符号链接）
+        在 filename 可能来源于外部输入时，安全的使拼接的路径在 dir_path 内（不支持跨出 dir_path 目录的符号链接）
 
         Args:
             dir_path: 要拼接的父路径，应是一个目录
@@ -176,11 +175,18 @@ class DatafileManager:
             解析后的JSON数据，字典结构的键为字符串，值为UserDataList；列表结构为UserDataList
         """
         file_path = self._safe_pathjoin(self.data_dir, filename)
+        if not file_path.exists():
+            logger.error(f"{file_path} 不存在")
+            raise FileNotFoundError(f"{file_path} 不存在")
+        if file_path.is_dir():
+            logger.error(f"{file_path} 是目录，无法读取")
+            raise IsADirectoryError(f"{file_path} 是目录，无法读取")
+
         raw_data = file_path.read_text(encoding="utf-8")
         data = json.loads(raw_data)
 
         # 根据文件路径判断结构并转换为相应的对象
-        if str(file_path).endswith((self.banlist_filename, self.passlist_filename)):
+        if file_path.name in (self.banlist_filename, self.passlist_filename):
             # 验证数据类型是字典
             if not isinstance(data, dict):
                 logger.error(
@@ -208,9 +214,7 @@ class DatafileManager:
                     ]
                 )
             return result
-        elif str(file_path).endswith(
-            (self.banall_list_filename, self.passall_list_filename)
-        ):
+        elif file_path.name in (self.banall_list_filename, self.passall_list_filename):
             # 验证数据类型是列表
             if not isinstance(data, list):
                 logger.error(
@@ -229,9 +233,7 @@ class DatafileManager:
                     for item in data
                 ]
             )
-        elif str(file_path).endswith(
-            (self.umo_ban_list_filename, self.umo_pass_list_filename)
-        ):
+        elif file_path.name in (self.umo_ban_list_filename, self.umo_pass_list_filename):
             # 验证数据类型是列表
             if not isinstance(data, list):
                 logger.error(
@@ -289,9 +291,12 @@ class DatafileManager:
         """
         if self._WAL_path.exists() and self._WAL_ready_path.exists():
             # 通常因用户手动创建了相关文件导致
-            raise WALFileExistsError("存在 WAL 文件，写入操作无法执行。")
+            WAL_backup_filename = "WAL_" + str(int(time_module.time())) + ".bak"
+            self._WAL_path.rename(self.data_dir / WAL_backup_filename)
+            logger.warning(f"存在 WAL 文件，已将其重命名为 {WAL_backup_filename}")
         self._WAL_path.write_bytes(msgpack.packb(self._commits, use_bin_type=True))
-        self._WAL_ready_path.touch()
+        # 用户可能手动创建了 WAL ready 文件，而没有创建 WAL 文件
+        self._WAL_ready_path.touch(exist_ok=True)
         self._WAL_write(True)
 
     def _WAL_write(self, from_syncfun: bool):
@@ -301,13 +306,35 @@ class DatafileManager:
         Args:
             from_syncfun: 若调用来源是 sync_and_clean_data() 方法，则请置为True；若调用来源是 __init__() （崩溃重放），则请置为False
         """
+        def unpack_WAL() -> dict[str, str]:
+            """
+            WAL 文件解包器
+            """
+            try:
+                data = msgpack.unpackb(self._WAL_path.read_bytes(), raw=False)
+                if not isinstance(data, dict):
+                    raise ValueError("WAL 解包出的对象类型不合法")
+                for key, value in data.items():
+                    if not isinstance(key, str) or not isinstance(value, str):
+                        raise ValueError("WAL 解包出的对象类型不合法")
+                return data
+            except Exception as e:
+                WAL_backup_filename = "WAL_" + str(int(time_module.time())) + ".bak"
+                self._WAL_path.rename(self.data_dir / WAL_backup_filename)
+                logger.error(f"在 WAL 解包时出现异常：{e}\n已将其重命名为 {WAL_backup_filename}，并跳过本次数据写入")
+                # 直接返回空字典，即无任何需写入数据
+                return {}
+
         datas: dict[str, str] = (
             self._commits
             if from_syncfun
-            else msgpack.unpackb(self._WAL_path.read_bytes(), raw=False)
+            else unpack_WAL()
         )
         for filename, data in datas.items():
             file_path = self._safe_pathjoin(self.data_dir, filename)
+            if file_path.is_dir() and file_path.exists():
+                logger.error(f"{file_path} 是一个目录，无法写入数据，将跳过该写入操作")
+                continue
             file_path.write_text(data, encoding="utf-8")
         self._WAL_ready_path.unlink()
         self._WAL_path.unlink()
@@ -610,12 +637,13 @@ class DatafileManager:
         self, data_name: list[str] | None = None
     ) -> dict[str, dict[str, UserDataList] | BaseModelList]: ...
 
-    def get_clear_data(self, data_name=None):
+    def get_clear_data(self, data_name=None, no_copy=False):
         """
         获取缓存数据
 
         Args:
             data_name: 要获取的缓存数据的名称，可以是单个字符串或列表。如果为None，则返回所有数据；如果为列表，则返回包含指定名称的数据项的的字典；如果为单个字符串，则返回指定名称的数据项。
+            no_copy: 直接返回相应的对象，该对象与缓存指向的对象一致
 
         Returns:
             包含指定名称的数据项的字典（dict[str, dict[str, UserDataList] | BaseModelList]）或指定名称的数据项（dict[str, UserDataList] | BaseModelList）
@@ -628,8 +656,12 @@ class DatafileManager:
             "umoban": self._umo_ban_list_cache,
             "umopass": self._umo_pass_list_cache,
         }
+        if not no_copy:
+            full_data = {
+                key: copy.deepcopy(value) for key, value in full_data.items()
+            }
         if isinstance(data_name, str):
-            return full_data[data_name]
+            return full_data.get(data_name, full_data)
         elif data_name and all(key in full_data for key in data_name):
             return {key: full_data[key] for key in data_name}
         return full_data
