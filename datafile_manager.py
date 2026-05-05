@@ -677,12 +677,12 @@ class DatafileManager:
 
     @overload
     def get_clear_data(
-        self, data_name: str
+        self, data_name: str, no_copy=False
     ) -> dict[str, UserDataList] | BaseModelList: ...
 
     @overload
     def get_clear_data(
-        self, data_name: list[str] | None = None
+        self, data_name: list[str] | None = None, no_copy=False
     ) -> dict[str, dict[str, UserDataList] | BaseModelList]: ...
 
     def get_clear_data(self, data_name=None, no_copy=False):

@@ -24,7 +24,7 @@ class ModelListRegistry:
             weakref.WeakValueDictionary()
         )
         self._lock = threading.Lock()
-        self._stop_event = threading.Event()
+        self.stop_event = threading.Event()
         self._thread = threading.Thread(
             target=self._clear_loop, daemon=True, name="ModelListClearer"
         )
@@ -39,7 +39,7 @@ class ModelListRegistry:
         """后台任务循环，每秒执行一次清理任务"""
         while not self._stop_event.is_set():
             self._clear_task()
-            self._stop_event.wait(1)
+            self.stop_event.wait(1)
 
     def _clear_task(self) -> None:
         """清理任务，扫描所有注册的列表"""

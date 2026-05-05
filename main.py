@@ -12,6 +12,8 @@ from .user_manager import (
     UserDataModel,
     UmoDataModel,
     UmoDataList,
+    ModelListRegistry,
+    MODEL_LIST_REGISTRY,
 )
 from .event_utils import EventUtils
 from .exceptions import *
@@ -839,3 +841,4 @@ class ReNeBan(Star):
 
     async def terminate(self):
         """可选择实现 terminate 函数，当插件被卸载/停用时会调用。"""
+        MODEL_LIST_REGISTRY.stop_event.set()

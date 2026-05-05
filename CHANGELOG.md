@@ -7,4 +7,4 @@
 将事件相关的辅助函数提取到 `EventUtils` 中，并在 `strings.py` 中集中处理命令错误/原因格式化和时间解析错误消息。
 在 README 中阐明 `dec-*` 命令描述和时间语义，包括如何处理零/省略的时长。
 在 `requirements.txt` 中新增 `msgpack` 作为运行时依赖。
-增加 `CHANGELIG.md` 更新日志。
+增加 `CHANGELOG.md` 更新日志。
