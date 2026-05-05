@@ -253,8 +253,7 @@ class BaseModelList(list):
 
             if value._get_id_field_value() in self._ids:
                 self.remove_by_id(value._get_id_field_value())
-            else:
-                self._ids.add(value._get_id_field_value())
+            self._ids.add(value._get_id_field_value())
             super().append(value)
 
     def extend(self, iterable):
