@@ -223,6 +223,14 @@ class DatafileManager:
                             reason=item.get("reason"),
                         )
                         for item in value
+                        if "uid" in item
+                        and "time" in item
+                        and isinstance(item["uid"], str)
+                        and isinstance(item["time"], int)
+                        and (
+                            item.get("reason") is None
+                            or isinstance(item.get("reason"), str)
+                        )
                     ]
                 )
             return result
@@ -243,6 +251,14 @@ class DatafileManager:
                         reason=item.get("reason"),
                     )
                     for item in data
+                    if "uid" in item
+                    and "time" in item
+                    and isinstance(item["uid"], str)
+                    and isinstance(item["time"], int)
+                    and (
+                        item.get("reason") is None
+                        or isinstance(item.get("reason"), str)
+                    )
                 ]
             )
         elif file_path.name in (
@@ -265,6 +281,14 @@ class DatafileManager:
                         reason=item.get("reason"),
                     )
                     for item in data
+                    if "umo" in item
+                    and "time" in item
+                    and isinstance(item["umo"], str)
+                    and isinstance(item["time"], int)
+                    and (
+                        item.get("reason") is None
+                        or isinstance(item.get("reason"), str)
+                    )
                 ]
             )
         else:
@@ -497,8 +521,8 @@ class DatafileManager:
             )
             # 3c. 清理pass：只保留有对应ban或banall的uid
             # 在umoban_data不为空的情况下，clear不执行
-            combined_ban_uids: set[str] = banall_uids
             for umo in list(pass_data.keys()):
+                combined_ban_uids: set[str] = set(banall_uids)
                 combined_ban_uids.update(
                     item.uid for item in ban_data.get(umo, UserDataList())
                 )
