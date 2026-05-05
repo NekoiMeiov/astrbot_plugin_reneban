@@ -73,7 +73,7 @@ class DatafileManager:
         self.sync_and_clean_data(no_return=True)
 
     def _initialize_files(self):
-        """初始化所有数据文件"""
+        """初始化所有必要数据文件"""
         # 迁移：旧版 passlist.json -> 新版 pass_list.json，banlist同理
         old_passlist = self.data_dir / "passlist.json"
         old_banlist = self.data_dir / "banlist.json"
@@ -182,8 +182,20 @@ class DatafileManager:
             logger.error(f"{file_path} 是目录，无法读取")
             raise IsADirectoryError(f"{file_path} 是目录，无法读取")
 
-        raw_data = file_path.read_text(encoding="utf-8")
-        data = json.loads(raw_data)
+        try:
+            raw_data = file_path.read_text(encoding="utf-8")
+            data = json.loads(raw_data)
+        except Exception as e:
+            backup_filename = (
+                f"{file_path.stem}_{int(time_module.time())}{file_path.suffix}.bak"
+            )
+            file_path.rename(file_path.parent / backup_filename)
+            self._initialize_files()
+            logger.error(
+                f"文件 {file_path} 解析失败：{e}\n已将其重命名为 {backup_filename} 并重新初始化必要数据文件。读取操作继续。"
+            )
+            raw_data = file_path.read_text(encoding="utf-8")
+            data = json.loads(raw_data)
 
         # 根据文件路径判断结构并转换为相应的对象
         if file_path.name in (self.banlist_filename, self.passlist_filename):
@@ -233,7 +245,10 @@ class DatafileManager:
                     for item in data
                 ]
             )
-        elif file_path.name in (self.umo_ban_list_filename, self.umo_pass_list_filename):
+        elif file_path.name in (
+            self.umo_ban_list_filename,
+            self.umo_pass_list_filename,
+        ):
             # 验证数据类型是列表
             if not isinstance(data, list):
                 logger.error(
@@ -291,7 +306,7 @@ class DatafileManager:
         """
         if self._WAL_path.exists() and self._WAL_ready_path.exists():
             # 通常因用户手动创建了相关文件导致
-            WAL_backup_filename = "WAL_" + str(int(time_module.time())) + ".bak"
+            WAL_backup_filename = f"WAL_{str(int(time_module.time()))}.bak"
             self._WAL_path.rename(self.data_dir / WAL_backup_filename)
             logger.warning(f"存在 WAL 文件，已将其重命名为 {WAL_backup_filename}")
         self._WAL_path.write_bytes(msgpack.packb(self._commits, use_bin_type=True))
@@ -306,6 +321,7 @@ class DatafileManager:
         Args:
             from_syncfun: 若调用来源是 sync_and_clean_data() 方法，则请置为True；若调用来源是 __init__() （崩溃重放），则请置为False
         """
+
         def unpack_WAL() -> dict[str, str]:
             """
             WAL 文件解包器
@@ -321,15 +337,13 @@ class DatafileManager:
             except Exception as e:
                 WAL_backup_filename = "WAL_" + str(int(time_module.time())) + ".bak"
                 self._WAL_path.rename(self.data_dir / WAL_backup_filename)
-                logger.error(f"在 WAL 解包时出现异常：{e}\n已将其重命名为 {WAL_backup_filename}，并跳过本次数据写入")
+                logger.error(
+                    f"在 WAL 解包时出现异常：{e}\n已将其重命名为 {WAL_backup_filename}，并跳过本次数据写入"
+                )
                 # 直接返回空字典，即无任何需写入数据
                 return {}
 
-        datas: dict[str, str] = (
-            self._commits
-            if from_syncfun
-            else unpack_WAL()
-        )
+        datas: dict[str, str] = self._commits if from_syncfun else unpack_WAL()
         for filename, data in datas.items():
             file_path = self._safe_pathjoin(self.data_dir, filename)
             if file_path.is_dir() and file_path.exists():
@@ -337,7 +351,8 @@ class DatafileManager:
                 continue
             file_path.write_text(data, encoding="utf-8")
         self._WAL_ready_path.unlink()
-        self._WAL_path.unlink()
+        # 可能因解包失败导致 WAL 文件不存在
+        self._WAL_path.unlink(missing_ok=True)
 
     @overload
     def get_data(self, data_name: str) -> dict[str, UserDataList] | BaseModelList: ...
@@ -484,7 +499,9 @@ class DatafileManager:
             # 在umoban_data不为空的情况下，clear不执行
             combined_ban_uids: set[str] = banall_uids
             for umo in list(pass_data.keys()):
-                combined_ban_uids.update(item.uid for item in ban_data.get(umo, UserDataList()))
+                combined_ban_uids.update(
+                    item.uid for item in ban_data.get(umo, UserDataList())
+                )
                 pass_data[umo] = UserDataList(
                     [item for item in pass_data[umo] if item.uid in combined_ban_uids]
                 )
@@ -657,9 +674,7 @@ class DatafileManager:
             "umopass": self._umo_pass_list_cache,
         }
         if not no_copy:
-            full_data = {
-                key: copy.deepcopy(value) for key, value in full_data.items()
-            }
+            full_data = {key: copy.deepcopy(value) for key, value in full_data.items()}
         if isinstance(data_name, str):
             return full_data[data_name]
         elif data_name and all(key in full_data for key in data_name):

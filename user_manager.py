@@ -4,7 +4,6 @@ import time as time_module
 from .strings import noreason_to_none
 import threading
 import weakref
-from concurrent.futures import ThreadPoolExecutor
 
 from .exceptions import (
     PermanentRecordTimeSubtractionError,
@@ -21,7 +20,9 @@ class _ModelListRegistry:
     """
 
     def __init__(self):
-        self._lists: weakref.WeakValueDictionary[int, "BaseModelList"] = weakref.WeakValueDictionary()
+        self._lists: weakref.WeakValueDictionary[int, "BaseModelList"] = (
+            weakref.WeakValueDictionary()
+        )
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread = threading.Thread(
@@ -50,6 +51,7 @@ class _ModelListRegistry:
                     for item in rm_lst:
                         lst.remove(item)
             self._stop_event.wait(1)
+
 
 _MODEL_LIST_REGISTRY = _ModelListRegistry()
 
@@ -113,7 +115,9 @@ class BaseDataModel(MutableMapping):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return object.__getattribute__(self, "_data") == object.__getattribute__(other, "_data")
+        return object.__getattribute__(self, "_data") == object.__getattribute__(
+            other, "_data"
+        )
 
     def __copy__(self):
         return self.__class__(
@@ -208,7 +212,9 @@ class BaseModelList(list):
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
-            raise TypeError(f"{self.__class__.__name__} does not support slice assignment.")
+            raise TypeError(
+                f"{self.__class__.__name__} does not support slice assignment."
+            )
         with self._lock:
             if not isinstance(value, self.model_class):
                 raise TypeError(
@@ -337,6 +343,7 @@ class UserDataList(BaseModelList):
     def __deepcopy__(self, memo):
         return self.__class__(iterable=[copy.copy(m) for m in self])
 
+
 class UmoDataModel(BaseDataModel):
     """用户数据模型，继承自 BaseDataModel，使用 umo 作为主键"""
 
@@ -349,6 +356,7 @@ class UmoDataModel(BaseDataModel):
             time=self.time,
             reason=self.reason,
         )
+
 
 class UmoDataList(BaseModelList):
     """用户数据列表，继承自 BaseModelList，使用 umo 作为主键"""
