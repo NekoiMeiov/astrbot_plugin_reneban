@@ -12,7 +12,7 @@ from .exceptions import (
 )
 
 
-class _ModelListRegistry:
+class ModelListRegistry:
     """全局 BaseModelList 过期清理注册器
 
     维护所有活跃 BaseModelList 的弱引用，由一个后台线程定期清理过期记录。
@@ -36,24 +36,28 @@ class _ModelListRegistry:
             self._lists[id(lst)] = lst
 
     def _clear_loop(self) -> None:
-        """后台清理任务循环，每秒扫描所有注册的列表"""
+        """后台任务循环，每秒执行一次清理任务"""
         while not self._stop_event.is_set():
-            # 在锁外获取快照，避免持有锁时遍历耗时
-            with self._lock:
-                snapshots = list(self._lists.values())
-            for lst in snapshots:
-                with lst._lock:
-                    rm_lst = [
-                        item
-                        for item in lst
-                        if item.time != 0 and item.time < time_module.time()
-                    ]
-                    for item in rm_lst:
-                        lst.remove(item)
+            self._clear_task()
             self._stop_event.wait(1)
 
+    def _clear_task(self) -> None:
+        """清理任务，扫描所有注册的列表"""
+        # 在锁外获取快照，避免持有锁时遍历耗时
+        with self._lock:
+            snapshots = list(self._lists.values())
+        for lst in snapshots:
+            with lst._lock:
+                rm_lst = [
+                    item
+                    for item in lst
+                    if item.time != 0 and item.time < time_module.time()
+                ]
+                for item in rm_lst:
+                    lst.remove(item)
 
-_MODEL_LIST_REGISTRY = _ModelListRegistry()
+
+MODEL_LIST_REGISTRY = ModelListRegistry()
 
 
 class BaseDataModel(MutableMapping):
@@ -206,9 +210,17 @@ class BaseModelList(list):
         self.model_class = model_class
         self._ids: set[str] = set()
         self._lock = threading.RLock()
-        _MODEL_LIST_REGISTRY.register(self)
+        MODEL_LIST_REGISTRY.register(self)
         if iterable:
             self.extend(iterable)
+
+    def _resolve_key(self, key: int | str) -> int:
+        if isinstance(key, str):
+            item = self.find_by_id(key, no_copy=True)
+            if item is None:
+                raise KeyError(key)
+            return self.index(item)
+        return key
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
@@ -221,16 +233,26 @@ class BaseModelList(list):
                     f"{self.__class__.__name__} can only hold instances of {self.model_class.__name__}, but {type(value)} was passed in."
                 )
 
+            key = self._resolve_key(key)
             rm_item = self.find_by_id(value._get_id_field_value(), no_copy=True)
+            if rm_item == self[key]:
+                rm_item = None
+            self._ids.remove(self[key]._get_id_field_value())
             self._ids.add(value._get_id_field_value())
             super().__setitem__(key, value)
-            if rm_item is not None:
+            if rm_item in self:
                 super().remove(rm_item)
 
     def __delitem__(self, key):
         with self._lock:
+            key = self._resolve_key(key)
             self._ids.remove(self[key]._get_id_field_value())
             super().__delitem__(key)
+
+    def __getitem__(self, key):
+        with self._lock:
+            key = self._resolve_key(key)
+            return super().__getitem__(key)
 
     def __copy__(self):
         return self.__class__(model_class=self.model_class, iterable=self)
@@ -242,8 +264,8 @@ class BaseModelList(list):
 
     def remove(self, value):
         with self._lock:
-            self._ids.remove(value._get_id_field_value())
             super().remove(value)
+            self._ids.remove(value._get_id_field_value())
 
     def append(self, value):
         with self._lock:

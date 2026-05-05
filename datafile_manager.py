@@ -17,6 +17,8 @@ from .user_manager import (
     UmoDataList,
     BaseDataModel,
     BaseModelList,
+    ModelListRegistry,
+    MODEL_LIST_REGISTRY,
 )
 
 from astrbot.api import logger
@@ -223,7 +225,8 @@ class DatafileManager:
                             reason=item.get("reason"),
                         )
                         for item in value
-                        if "uid" in item
+                        if isinstance(item, dict)
+                        and "uid" in item
                         and "time" in item
                         and isinstance(item["uid"], str)
                         and isinstance(item["time"], int)
@@ -251,7 +254,8 @@ class DatafileManager:
                         reason=item.get("reason"),
                     )
                     for item in data
-                    if "uid" in item
+                    if isinstance(item, dict)
+                    and "uid" in item
                     and "time" in item
                     and isinstance(item["uid"], str)
                     and isinstance(item["time"], int)
@@ -281,7 +285,8 @@ class DatafileManager:
                         reason=item.get("reason"),
                     )
                     for item in data
-                    if "umo" in item
+                    if isinstance(item, dict)
+                    and "umo" in item
                     and "time" in item
                     and isinstance(item["umo"], str)
                     and isinstance(item["time"], int)
@@ -628,6 +633,8 @@ class DatafileManager:
                 umoban_data,
                 umopass_data,
             )
+
+            MODEL_LIST_REGISTRY._clear_task()
 
             self._write_file_commit(self.banall_list_filename, banall_data)
             self._write_file_commit(self.passall_list_filename, passall_data)
