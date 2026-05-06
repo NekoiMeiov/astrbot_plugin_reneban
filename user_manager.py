@@ -1,325 +1,403 @@
-"""
-用户(禁用)数据模型，获取at，判断是否禁用，并提供操作接口
-"""
+from collections.abc import MutableMapping
+import copy
+import time as time_module
+from .strings import noreason_to_none
+import threading
+import weakref
 
-from astrbot.api.event import AstrMessageEvent
-import astrbot.api.message_components as Comp
+from .exceptions import (
+    PermanentRecordTimeSubtractionError,
+    TimeNegativeError,
+    PermanentRecordTimeAdditionError,
+)
 
 
-class AtNumberError(ValueError):
+class ModelListRegistry:
+    """全局 BaseModelList 过期清理注册器
+
+    维护所有活跃 BaseModelList 的弱引用，由一个后台线程定期清理过期记录。
+    当 BaseModelList 实例被 GC 回收时，弱引用自动移除，无需显式反注册。
     """
-    At 数量错误（ReNeBan.get_event_at() 获取@用户时，如果 At 用户数量大于 1，会抛出此错误）
-    """
 
-    pass
+    def __init__(self):
+        self._lists: weakref.WeakValueDictionary[int, "BaseModelList"] = (
+            weakref.WeakValueDictionary()
+        )
+        self._lock = threading.Lock()
+        self.stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._clear_loop, daemon=True, name="ModelListClearer"
+        )
+        self.start()
+
+    def start(self) -> None:
+        if self.stop_event.is_set():
+            self.stop_event.clear()
+        if not self._thread.is_alive():
+            # 线程已死，需要新建 Thread 对象
+            self._thread = threading.Thread(
+                target=self._clear_loop, daemon=True, name="ModelListClearer"
+            )
+            self._thread.start()
+
+    def register(self, lst: "BaseModelList") -> None:
+        """注册一个 BaseModelList 到清理任务"""
+        with self._lock:
+            self._lists[id(lst)] = lst
+
+    def _clear_loop(self) -> None:
+        """后台任务循环，每秒执行一次清理任务"""
+        while not self.stop_event.is_set():
+            self._clear_task()
+            self.stop_event.wait(1)
+
+    def _clear_task(self) -> None:
+        """清理任务，扫描所有注册的列表"""
+        # 在锁外获取快照，避免持有锁时遍历耗时
+        with self._lock:
+            snapshots = list(self._lists.values())
+        for lst in snapshots:
+            with lst._lock:
+                rm_lst = [
+                    item
+                    for item in lst
+                    if item.time != 0 and item.time < time_module.time()
+                ]
+                for item in rm_lst:
+                    lst.remove(item)
 
 
-class InvalidKeyError(KeyError):
-    pass
+MODEL_LIST_REGISTRY = ModelListRegistry()
 
 
-class UserDataModel(dict):
-    __slots__ = ("_initialized", "uid", "time", "reason")  # 定义属性槽和初始化标志
-    ALLOWED_KEYS = frozenset({"uid", "time", "reason"})
-    IMMUTABLE_KEYS = frozenset({"uid"})  # 真正只读字段
+class BaseDataModel(MutableMapping):
+    """基础数据模型，提供通用的数据管理功能"""
 
-    # ---------- 构造 ----------
-    def __init__(self, uid: str, time: int, reason: str = "无理由"):
-        super().__init__(uid=uid, time=time, reason=reason)
-        # 直接设置属性，绕过 __setattr__ 检查
-        object.__setattr__(self, "uid", uid)
-        object.__setattr__(self, "time", time)
-        object.__setattr__(self, "reason", reason)
-        object.__setattr__(self, "_initialized", True)
+    __slots__ = ("_data", "_allowed_keys", "_id_field")
 
-    # ---------- 反序列化 ----------
-    @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "UserDataModel":
-        filtered_data = {k: v for k, v in data.items() if k in cls.ALLOWED_KEYS}
-        return cls(**filtered_data)
+    def __init__(
+        self, id_field: str, id_value: str, time: int, reason: str | None = None
+    ):
+        object.__setattr__(
+            self,
+            "_data",
+            {id_field: id_value, "time": time, "reason": noreason_to_none(reason)},
+        )
+        object.__setattr__(
+            self, "_allowed_keys", frozenset((id_field, "time", "reason"))
+        )
+        object.__setattr__(self, "_id_field", id_field)
+        # object.__setattr__(self, "_lock", threading.RLock())
 
-    # ---------- 字典通道 ----------
+    def __getitem__(self, key):
+        return object.__getattribute__(self, "_data")[key]
+
     def __setitem__(self, key, value):
-        if key not in self.ALLOWED_KEYS:
-            raise InvalidKeyError(key)
-        if key in self.IMMUTABLE_KEYS and key in self:
-            raise InvalidKeyError(f"{key} is immutable")
-        super().__setitem__(key, value)
-        object.__setattr__(self, key, value)
+        if key not in object.__getattribute__(self, "_allowed_keys"):
+            raise KeyError(key)
+        if key == self._get_id_field_name():
+            raise TypeError(f"primary key {key!r} is read-only")
+        if key == "time" and not isinstance(value, int):
+            raise TypeError(f"time must be int, got {type(value).__name__}")
+        if key == "reason" and value is not None and not isinstance(value, str):
+            value = noreason_to_none(str(value))
+        object.__getattribute__(self, "_data")[key] = value
 
-    # ---------- 属性通道 ----------
-    def __setattr__(self, name, value):
-        if name in self.ALLOWED_KEYS:
-            # 使用字典通道以确保验证
-            self[name] = value
-        elif name.startswith("_") or getattr(self.__class__, name, None):
-            super().__setattr__(name, value)
-        else:
-            raise InvalidKeyError(name)
+    def __delitem__(self, key):
+        raise TypeError("deletion is not allowed")
 
-    # ---------- 属性访问 ----------
     def __getattr__(self, name):
-        # 为 uid, time, reason 提供属性访问方式
-        if name in self.ALLOWED_KEYS:
+        if name in object.__getattribute__(self, "_allowed_keys"):
             return self[name]
-        raise AttributeError(
-            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name in object.__getattribute__(self, "_allowed_keys"):
+            self[name] = value
+        else:
+            raise AttributeError(f"'{name}' is not a valid attribute")
+
+    def __delattr__(self, name):
+        raise TypeError("deletion is not allowed")
+
+    def __iter__(self):
+        return iter(object.__getattribute__(self, "_data"))
+
+    def __len__(self):
+        return len(object.__getattribute__(self, "_data"))
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return object.__getattribute__(self, "_data") == object.__getattribute__(
+            other, "_data"
         )
 
-    # ---------- 业务接口 ----------
-    def update_data(self, *, time: int | None = None, reason: str | None = None):
+    def __copy__(self):
+        return self.__class__(
+            id_field=self._get_id_field_name(),
+            id_value=self._get_id_field_value(),
+            time=self.time,
+            reason=self.reason,
+        )
+
+    def __deepcopy__(self, memo):
+        return copy.copy(self)
+
+    def _get_id_field_name(self) -> str:
+        """获取 id 字段名称"""
+        return object.__getattribute__(self, "_id_field")
+
+    def _get_id_field_value(self) -> str:
+        """获取 id 字段值"""
+        return getattr(self, self._get_id_field_name())
+
+    def update_data(self, time: int | None = None, reason: str | None = None):
+        """
+        更新数据
+        """
         if time is not None:
-            self["time"] = time
-        if reason is not None:
-            self["reason"] = reason
+            if time < 0:
+                raise TimeNegativeError("Time must be non-negative")
+            self.time = time
+        self.reason = noreason_to_none(reason)
 
-    def add_time(self, seconds: int, reason: str | None = None):
+    def add_time(self, time: int, reason: str | None = None):
         """
-        增加时间（秒）或设置为永久
-        - 如果当前为永久（time=0），则抛出异常
-        - 如果传入的秒数为0，表示将记录设置为永久
-        - 否则，在当前时间基础上增加相应秒数
-        - reason: 可选的理由
+        添加时间
         """
+        if time < 0:
+            raise TimeNegativeError("Time must be non-negative")
         if self.time == 0:
-            raise ValueError("Cannot add time to a permanent record")
+            raise PermanentRecordTimeAdditionError(
+                "Cannot add time to a permanent record"
+            )
+        self.update_data(time=0 if time == 0 else self.time + time, reason=reason)
 
-        if seconds == 0:
-            # 传入0表示设为永久
-            self.update_data(time=0, reason=reason)
-        else:
-            new_time = self.time + seconds
-            self.update_data(time=new_time, reason=reason)
-
-    def subtract_time(self, seconds: int, reason: str | None = None):
+    def subtract_time(self, time: int, reason: str | None = None):
         """
-        减少时间（秒）
-        - 如果当前为永久且要减少的时间不为0，抛出异常
-        - 如果要减少的时间为0，将时间戳设置为1（过期）
-        - 否则从当前时间中减去相应秒数
-        - reason: 可选的理由
+        减去时间
         """
-        if self.time == 0 and seconds != 0:
-            raise ValueError("Cannot subtract time from a permanent record")
+        if time < 0:
+            raise TimeNegativeError("Time must be non-negative")
+        if self.time == 0 and time != 0:
+            raise PermanentRecordTimeSubtractionError(
+                "Cannot subtract a finite amount of time from a permanent record"
+            )
+        self.update_data(
+            time=1 if time == 0 else max(1, self.time - time), reason=reason
+        )
 
-        if seconds == 0:
-            # 如果减少的时间为0，将时间戳设置为1（必然过期）
-            new_time = 1
-        else:
-            new_time = self.time - seconds
+    def to_dict(self) -> dict[str, str | int]:
+        """转换为字典"""
+        return {
+            k: v
+            for k, v in object.__getattribute__(self, "_data").items()
+            if v is not None
+        }
 
-        self.update_data(time=new_time, reason=reason)
 
-
-class UserDataList(list):
+class BaseModelList(list):
     """
-    存放 UserDataModel 实例的列表
+    基础模型列表，提供通用的列表管理功能
+    注意：
+        此类虽继承 list 类，但并未重写所有增删改方法，使用此类未重写的方法可能会导致一些问题
+        请注意不要使用此类未重写的 list 方法
+        若您需要用到未重写的方法，请：
+            1. 自行维护 _ids 变量
+            2. 新建Issue
+            3. 新建Pull Request
+        当前可用的已重写方法：
+            - __setitem__
+            - __delitem__
+            - remove
+            - append
+            - extend
     """
 
-    def __init__(self, iterable=None):
+    def __init__(self, model_class: type[BaseDataModel], iterable: list | None = None):
         super().__init__()
+        self.model_class = model_class
+        self._ids: set[str] = set()
+        self._lock = threading.RLock()
+        MODEL_LIST_REGISTRY.register(self)
         if iterable:
+            self.extend(iterable)
+
+    def _resolve_key(self, key: int | str) -> int:
+        if isinstance(key, str):
+            item = self.find_by_id(key, no_copy=True)
+            if item is None:
+                raise KeyError(key)
+            return self.index(item)
+        return key
+
+    def __setitem__(self, key, value):
+        if isinstance(key, slice):
+            raise TypeError(
+                f"{self.__class__.__name__} does not support slice assignment."
+            )
+        with self._lock:
+            if not isinstance(value, self.model_class):
+                raise TypeError(
+                    f"{self.__class__.__name__} can only hold instances of {self.model_class.__name__}, but {type(value)} was passed in."
+                )
+
+            key = self._resolve_key(key)
+            rm_item = self.find_by_id(value._get_id_field_value(), no_copy=True)
+            if rm_item == self[key]:
+                rm_item = None
+            self._ids.remove(self[key]._get_id_field_value())
+            self._ids.add(value._get_id_field_value())
+            super().__setitem__(key, value)
+            if rm_item in self:
+                super().remove(rm_item)
+
+    def __delitem__(self, key):
+        with self._lock:
+            key = self._resolve_key(key)
+            self._ids.remove(self[key]._get_id_field_value())
+            super().__delitem__(key)
+
+    def __getitem__(self, key):
+        with self._lock:
+            key = self._resolve_key(key)
+            return super().__getitem__(key)
+
+    def __copy__(self):
+        return self.__class__(model_class=self.model_class, iterable=self)
+
+    def __deepcopy__(self, memo):
+        return self.__class__(
+            model_class=self.model_class, iterable=[copy.copy(m) for m in self]
+        )
+
+    def remove(self, value):
+        with self._lock:
+            super().remove(value)
+            self._ids.remove(value._get_id_field_value())
+
+    def append(self, value):
+        with self._lock:
+            if not isinstance(value, self.model_class):
+                raise TypeError(
+                    f"{self.__class__.__name__} can only hold instances of {self.model_class.__name__}, but {type(value)} was passed in."
+                )
+
+            if value._get_id_field_value() in self._ids:
+                self.remove_by_id(value._get_id_field_value())
+            self._ids.add(value._get_id_field_value())
+            super().append(value)
+
+    def extend(self, iterable):
+        with self._lock:
             for item in iterable:
                 self.append(item)
 
-    def append(self, obj: UserDataModel):
-        """
-        添加一个 UserDataModel 实例到列表中
-        """
-        if not isinstance(obj, UserDataModel):
-            raise TypeError(f"只能添加 UserDataModel 实例，但传入了 {type(obj)}")
-        super().append(obj)
+    def find_by_id(self, id_value: str, no_copy: bool = False) -> BaseDataModel | None:
+        """根据ID查找数据"""
+        with self._lock:
+            for item in self:
+                if item._get_id_field_value() == id_value:
+                    return item if no_copy else copy.copy(item)
+            return None
 
-    def extend(self, iterable):
-        """
-        扩展列表，只接受 UserDataModel 实例
-        """
-        for item in iterable:
-            self.append(item)
+    def remove_by_id(self, id_value: str) -> bool:
+        """根据ID移除数据"""
+        with self._lock:
+            for idx, item in enumerate(self):
+                if item._get_id_field_value() == id_value:
+                    del self[idx]
+                    return True
+            return False
 
-    def insert(self, index: int, obj: UserDataModel):
-        """
-        在指定位置插入 UserDataModel 实例
-        """
-        if not isinstance(obj, UserDataModel):
-            raise TypeError(f"只能插入 UserDataModel 实例，但传入了 {type(obj)}")
-        super().insert(index, obj)
-
-    def find_by_uid(self, uid: str) -> UserDataModel | None:
-        """
-        根据 uid 查找用户数据
-        """
-        for user_data in self:
-            if user_data.uid == uid:
-                return user_data
-        return None
-
-    def remove_by_uid(self, uid: str) -> bool:
-        """
-        根据 uid 移除用户数据
-        :param uid: 要移除的用户 ID
-        :return: 如果找到并移除则返回 True，否则返回 False
-        """
-        for i, user_data in enumerate(self):
-            if user_data.uid == uid:
-                self.pop(i)
-                return True
-        return False
-
-    def update_user(self, uid: str, new_time: int, reason: str | None = None) -> bool:
-        """
-        更新指定用户的禁用时间
-        :param uid: 用户 ID
-        :param new_time: 新的禁用时间
-        :param reason: 更新理由（可选）
-        :return: 如果找到用户并更新成功则返回 True，否则返回 False
-        """
-        user_data = self.find_by_uid(uid)
-        if user_data:
-            user_data.update_data(time=new_time, reason=reason)
-            return True
-        return False
-
-    def update_user_reason(self, uid: str, new_reason: str) -> bool:
-        """
-        更新指定用户的禁用理由
-        :param uid: 用户 ID
-        :param new_reason: 新的禁用理由
-        :return: 如果找到用户并更新成功则返回 True，否则返回 False
-        """
-        user_data = self.find_by_uid(uid)
-        if user_data:
-            user_data.update_data(reason=new_reason)
-            return True
-        return False
-
-    def update_user_full(
-        self, uid: str, new_time: int | None = None, new_reason: str | None = None
+    def update_data(
+        self, id_value: str, time: int | None = None, reason: str | None = None
     ) -> bool:
-        """
-        更新指定用户的禁用时间与理由
-        :param uid: 用户 ID
-        :param new_time: 新的禁用时间（可选）
-        :param new_reason: 新的禁用理由（可选）
-        :return: 如果找到用户并更新成功则返回 True，否则返回 False
-        """
-        user_data = self.find_by_uid(uid)
-        if user_data:
-            user_data.update_data(time=new_time, reason=new_reason)
+        """更新数据"""
+        with self._lock:
+            item = self.find_by_id(id_value, no_copy=True)
+            if item is None:
+                return False
+            item.update_data(time=time, reason=reason)
             return True
-        return False
 
-    def add_time_to_user(
-        self, uid: str, seconds: int, reason: str | None = None
+    def add_time_to_data(
+        self, id_value: str, time: int, reason: str | None = None
     ) -> bool:
-        """
-        为指定用户增加时间
-        :param uid: 用户 ID
-        :param seconds: 要增加的时间（秒）
-        :param reason: 操作理由（可选）
-        :return: 如果找到用户并操作成功则返回 True，否则返回 False
-        """
-        user_data = self.find_by_uid(uid)
-        if user_data:
-            try:
-                user_data.add_time(seconds, reason)
-                return True
-            except ValueError:
-                return False  # 如果是永久记录则无法增加时间
-        return False
+        """为指定数据增加时间"""
+        with self._lock:
+            item = self.find_by_id(id_value, no_copy=True)
+            if item is None:
+                return False
+            item.add_time(time=time, reason=reason)
+            return True
 
-    def subtract_time_from_user(
-        self, uid: str, seconds: int, reason: str | None = None
+    def subtract_time_from_data(
+        self, id_value: str, time: int, reason: str | None = None
     ) -> bool:
-        """
-        为指定用户减少时间
-        :param uid: 用户 ID
-        :param seconds: 要减少的时间（秒）
-        :param reason: 操作理由（可选）
-        :return: 如果找到用户并操作成功则返回 True，否则返回 False
-        """
-        user_data = self.find_by_uid(uid)
-        if user_data:
-            try:
-                user_data.subtract_time(seconds, reason)
-                return True
-            except ValueError:
-                return False  # 如果是永久记录则无法减少时间
-        return False
+        """为指定数据减少时间"""
+        with self._lock:
+            item = self.find_by_id(id_value, no_copy=True)
+            if item is None:
+                return False
+            item.subtract_time(time=time, reason=reason)
+            return True
+
+    def to_list(self) -> list[dict[str, str | int]]:
+        with self._lock:
+            return [m.to_dict() for m in self]
 
 
-class EventUtils:
-    """
-    事件工具类，包含处理事件的静态方法
-    """
+class UserDataModel(BaseDataModel):
+    """用户数据模型，继承自 BaseDataModel，使用 uid 作为主键"""
 
-    @staticmethod
-    def get_event_at(event: AstrMessageEvent) -> str | None:
-        """
-        获取at的用户uid
-        """
-        # 获取所有非自身的 At 用户
+    def __init__(self, uid: str, time: int, reason: str | None = None):
+        super().__init__(id_field="uid", id_value=uid, time=time, reason=reason)
 
-        at_users = [
-            str(seg.qq)
-            for seg in event.get_messages()
-            if isinstance(seg, Comp.At) and str(seg.qq) != event.get_self_id()
-        ]
-
-        # 如果 At 用户数量大于 1，则抛出错误
-        if len(at_users) > 1:
-            raise AtNumberError("消息中包含多个非bot自身的 At 标记")
-
-        # 返回第一个（也是唯一一个）At 用户，如果没有则返回 None
-        return at_users[0] if at_users else None
-
-    @staticmethod
-    def is_banned(
-        enable: bool, data_manager: "DatafileManager", event: AstrMessageEvent
-    ):
-        """
-        判断用户是否被禁用，以及其理由
-        """
-        # 禁用功能未启用
-        if not enable:
-            return (False, None)
-        # pass > ban > pass-all > ban-all
-        # 检查缓存是否有效，如果无效则调用clear_banned重建缓存
-        if not data_manager._is_cache_valid():
-            data_manager.clear_banned()
-
-        # 获取UMO
-        umo = event.unified_msg_origin
-        # pass - 使用缓存数据
-        # 如果不存在则返回空列表
-        umo_pass_list = (
-            data_manager._passlist_cache.get(umo)
-            if isinstance(data_manager._passlist_cache.get(umo), UserDataList)
-            else UserDataList()
+    def __copy__(self):
+        return self.__class__(
+            uid=self._get_id_field_value(),
+            time=self.time,
+            reason=self.reason,
         )
-        # 遍历umo_pass_list中用户数据的uid
-        for item in umo_pass_list:
-            if item.uid == event.get_sender_id():
-                return (False, item.reason)
-        # ban - 使用缓存数据
-        # 如果不存在则返回空列表
-        umo_ban_list = (
-            data_manager._banlist_cache.get(umo)
-            if isinstance(data_manager._banlist_cache.get(umo), UserDataList)
-            else UserDataList()
+
+
+class UserDataList(BaseModelList):
+    """用户数据列表，继承自 BaseModelList，使用 uid 作为主键"""
+
+    def __init__(self, iterable: list | None = None):
+        super().__init__(model_class=UserDataModel, iterable=iterable)
+
+    def __copy__(self):
+        return self.__class__(iterable=self)
+
+    def __deepcopy__(self, memo):
+        return self.__class__(iterable=[copy.copy(m) for m in self])
+
+
+class UmoDataModel(BaseDataModel):
+    """用户数据模型，继承自 BaseDataModel，使用 umo 作为主键"""
+
+    def __init__(self, umo: str, time: int, reason: str | None = None):
+        super().__init__(id_field="umo", id_value=umo, time=time, reason=reason)
+
+    def __copy__(self):
+        return self.__class__(
+            umo=self._get_id_field_value(),
+            time=self.time,
+            reason=self.reason,
         )
-        # 遍历umo_ban_list中用户数据的uid
-        for item in umo_ban_list:
-            if item.uid == event.get_sender_id():
-                return (True, item.reason)
-        # pass-all - 使用缓存数据
-        # 遍历passall_list中用户数据的uid
-        for item in data_manager._passall_list_cache:
-            if item.uid == event.get_sender_id():
-                return (False, item.reason)
-        # ban-all - 使用缓存数据
-        # 遍历banall_list中用户数据的uid
-        for item in data_manager._banall_list_cache:
-            if item.uid == event.get_sender_id():
-                return (True, item.reason)
-        return (False, None)
+
+
+class UmoDataList(BaseModelList):
+    """用户数据列表，继承自 BaseModelList，使用 umo 作为主键"""
+
+    def __init__(self, iterable: list | None = None):
+        super().__init__(model_class=UmoDataModel, iterable=iterable)
+
+    def __copy__(self):
+        return self.__class__(iterable=self)
+
+    def __deepcopy__(self, memo):
+        return self.__class__(iterable=[copy.copy(m) for m in self])

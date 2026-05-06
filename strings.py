@@ -1,7 +1,27 @@
-# 文案啥的放这
 # 无理由判断list
-no_reason = ["无理由", "None", "NULL"]
-# command语法
+_no_reason = ["无理由", "None", "NULL"]
+
+
+def noreason_to_none(reason: str | None) -> str | None:
+    if reason in _no_reason:
+        return None
+    return reason
+
+
+def command_error(command: str) -> str:
+    return messages["command_error"].format(
+        command=command, commands_text=commands[command]
+    )
+
+
+def reason_format(reason: str | None) -> str:
+    if noreason_to_none(reason):
+        return reason
+    else:
+        return messages["no_reason"]
+
+
+# command语法，通常不会修改
 commands = {
     "ban": "/ban <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
     "ban-all": "/ban-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
@@ -15,12 +35,13 @@ commands = {
     "dec-pass": "/dec-pass <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] [UMO]",
     "dec-ban-all": "/dec-ban-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
     "dec-pass-all": "/dec-pass-all <@用户|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）]",
-    "ban-reset": "/ban-reset",
+    "ban-reset": "/ban-reset <@用户|UID（QQ号）>",
 }
-# 输出文案
+# 默认输出文案
 messages = {
     "command_error": "语法错误，{command} 的语法应为 {commands_text}",
-    "time_zeroset_error": "{command} 已被设置永久时限，不支持叠加操作",
+    "invalid_timestr_error": "时间字符串 {timestr} 格式错误，请使用数字+单位，如：1d3m51s",
+    "time_zeroset_error": "相应的 {command} 记录已被设置为永久时限，不支持叠加操作",
     "banned_user": "已在 {umo} 禁用以下用户 {user}，时限：{time}，理由：{reason}",
     "banned_user_global": "已全局禁用 {user}，时限：{time}，理由：{reason}",
     "passed_user": "已在 {umo} 临时解限 {user}，时限：{time}，理由：{reason}",
@@ -33,14 +54,18 @@ messages = {
     "dec_zerotime_error": "无法删除，因为该用户的记录时限被设为永久，请设置删除时间为0以强制删除！",
     "group_banned_list": "本群禁用的用户:",
     "no_group_banned": "\n本群没有禁用用户呢！",
-    "global_banned_list": "全局禁用的用户:",
-    "no_global_banned": "\n全局没有禁用用户",
     "group_passed_list": "本群临时解限用户：",
     "no_group_passed": "\n本群没有临时解限用户呢！",
-    "no_reason": "无理由",
+    "global_banned_list": "全局禁用的用户:",
+    "no_global_banned": "\n全局没有禁用用户",
     "global_passed_list": "全局临时解限用户：",
     "no_global_passed": "\n全局没有临时解限用户",
-    "banlist_strlist_format": "\n - {user} - {time} - {reason}",
+    "umo_banned_list": "禁用的会话：",
+    "no_umo_banned": "\n没有禁用的会话呢！",
+    "umo_passed_list": "临时解限的会话：",
+    "no_umo_passed": "\n没有临时解限会话呢！",
+    "no_reason": "无理由",
+    "banlist_strlist_format": "\n - {id} - {time} - {reason}",
     "ban_reset_success": "已清除用户 {user} 的所有记录。",
     "ban_enabled": "已临时启用禁用功能～重启后失效",
     "ban_disabled": "已临时禁用禁用功能～重启后失效",
@@ -71,7 +96,7 @@ messages = {
 
 ⏰ 时间格式说明：
 - 数字+单位：1d(1天)/2h(2小时)/30m(30分钟)/10s(10秒)
-- 默认永久限制
+- 若不填写或时长为 0，则为永久。
 
 💡 注意事项：
 - 只有管理员可以操作
