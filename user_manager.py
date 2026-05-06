@@ -28,7 +28,17 @@ class ModelListRegistry:
         self._thread = threading.Thread(
             target=self._clear_loop, daemon=True, name="ModelListClearer"
         )
-        self._thread.start()
+        self.start()
+
+    def start(self) -> None:
+        if self.stop_event.is_set():
+            self.stop_event.clear()
+        if not self._thread.is_alive():
+            # 线程已死，需要新建 Thread 对象
+            self._thread = threading.Thread(
+                target=self._clear_loop, daemon=True, name="ModelListClearer"
+            )
+            self._thread.start()
 
     def register(self, lst: "BaseModelList") -> None:
         """注册一个 BaseModelList 到清理任务"""

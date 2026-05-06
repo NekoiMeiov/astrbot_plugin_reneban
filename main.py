@@ -26,6 +26,7 @@ class ReNeBan(Star):
         self.enable = config.get("enable", True)
         # 从插件配置中获取缓存存活时间，默认为60秒
         cache_ttl = config.get("cache_ttl", 60)
+        MODEL_LIST_REGISTRY.start()
         # 初始化数据文件管理器
         self.data_manager = DatafileManager(
             StarTools.get_data_dir(), cache_ttl=cache_ttl
@@ -269,7 +270,7 @@ class ReNeBan(Star):
         banlist: dict[str, UserDataList] = self.data_manager.get_data("ban")
         if banlist.get(umo) is None:
             banlist[umo] = UserDataList()
-        group_banned_list: UserDataList = banlist.get(umo)
+        group_banned_list: UserDataList = banlist[umo]
 
         try:
             update_time: int = time_utils.timestr_to_int(time)
@@ -281,7 +282,9 @@ class ReNeBan(Star):
                 new_ban_item = UserDataModel(
                     uid=ban_uid,
                     time=(
-                        (int(time_module.time()) + update_time) if time != "0" else 0
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
                     ),
                     reason=reason,
                 )
@@ -352,7 +355,9 @@ class ReNeBan(Star):
                 new_ban_item = UserDataModel(
                     uid=ban_uid,
                     time=(
-                        (int(time_module.time()) + update_time) if time != "0" else 0
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
                     ),
                     reason=reason,
                 )
@@ -418,7 +423,7 @@ class ReNeBan(Star):
         passlist: dict[str, UserDataList] = self.data_manager.get_data("pass")
         if passlist.get(umo) is None:
             passlist[umo] = UserDataList()
-        group_passed_list: UserDataList = passlist.get(umo)
+        group_passed_list: UserDataList = passlist[umo]
 
         try:
             update_time: int = time_utils.timestr_to_int(time)
@@ -430,7 +435,9 @@ class ReNeBan(Star):
                 new_pass_item = UserDataModel(
                     uid=pass_uid,
                     time=(
-                        (int(time_module.time()) + update_time) if time != "0" else 0
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
                     ),
                     reason=reason,
                 )
@@ -501,7 +508,9 @@ class ReNeBan(Star):
                 new_pass_item = UserDataModel(
                     uid=pass_uid,
                     time=(
-                        (int(time_module.time()) + update_time) if time != "0" else 0
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
                     ),
                     reason=reason,
                 )

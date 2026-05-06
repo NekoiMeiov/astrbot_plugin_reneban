@@ -545,6 +545,14 @@ class DatafileManager:
                 if not pass_data[umo]:
                     del pass_data[umo]
 
+        # 无论是否走了清理逻辑，都清除空键
+        for key in list(ban_data.keys()):
+            if not ban_data[key]:
+                del ban_data[key]
+        for key in list(pass_data.keys()):
+            if not pass_data[key]:
+                del pass_data[key]
+
         return banall_data, passall_data, ban_data, pass_data, umoban_data, umopass_data
 
     @overload
