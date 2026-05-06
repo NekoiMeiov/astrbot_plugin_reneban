@@ -332,6 +332,9 @@ class DatafileManager:
     def _write_commits(self):
         """
         将提交写入相应的文件
+
+        注意：本 WAL 机制目前仅提供应用进程级崩溃恢复保护
+        不使用 fsync / atomic rename，因此不保证系统级崩溃（如断电）时的数据安全
         """
         if self._WAL_path.exists() and self._WAL_ready_path.exists():
             # 通常因用户手动创建了相关文件导致
@@ -419,6 +422,10 @@ class DatafileManager:
     def write_data(self, data_name, data):
         if isinstance(data_name, str):
             return self.sync_and_clean_data(no_return=True, have_data={data_name: data})
+        elif len(data_name) != len(data):
+            raise ValueError(
+                f"data_name length ({len(data_name)}) does not match data length ({len(data)})"
+            )
         else:
             return self.sync_and_clean_data(
                 no_return=True,
@@ -671,8 +678,14 @@ class DatafileManager:
                     key: copy.deepcopy(value) for key, value in full_data.items()
                 }
 
-            if need_data and all(key in full_data for key in need_data):
-                return {key: full_data[key] for key in need_data}
+            if need_data:
+                if all(key in full_data for key in need_data):
+                    return {key: full_data[key] for key in need_data}
+                else:
+                    missing = "、".join(
+                        [key for key in need_data if key not in full_data]
+                    )
+                    raise ValueError(f"Missing required data field: {missing}")
             return full_data
 
     @overload
@@ -708,6 +721,10 @@ class DatafileManager:
             full_data = {key: copy.deepcopy(value) for key, value in full_data.items()}
         if isinstance(data_name, str):
             return full_data[data_name]
-        elif data_name and all(key in full_data for key in data_name):
-            return {key: full_data[key] for key in data_name}
+        elif data_name:
+            if all(key in full_data for key in data_name):
+                return {key: full_data[key] for key in data_name}
+            else:
+                missing = "、".join([key for key in data_name if key not in full_data])
+                raise ValueError(f"Missing required data field: {missing}")
         return full_data

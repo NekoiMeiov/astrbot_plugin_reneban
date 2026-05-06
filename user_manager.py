@@ -37,7 +37,7 @@ class ModelListRegistry:
 
     def _clear_loop(self) -> None:
         """后台任务循环，每秒执行一次清理任务"""
-        while not self._stop_event.is_set():
+        while not self.stop_event.is_set():
             self._clear_task()
             self.stop_event.wait(1)
 
