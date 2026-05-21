@@ -12,6 +12,17 @@ from .datafile_manager import DatafileManager
 from .exceptions import AtUserCountError
 
 
+def get_real_umo(event: AstrMessageEvent) -> str:
+    """
+    获取真实的会话 UMO，绕过隔离会话（unique_session）对 session_id 的改写。
+    使用 message_obj.session_id，该值由平台适配器设置，不受 unique_session 影响。
+    """
+    original_session_id = event.message_obj.session_id
+    platform_id = event.get_platform_id()
+    msg_type = event.get_message_type().value
+    return f"{platform_id}:{msg_type}:{original_session_id}"
+
+
 class EventUtils:
     """
     事件工具类，包含处理事件的静态方法
@@ -57,7 +68,7 @@ class EventUtils:
             )
 
         # 获取UMO与UID
-        umo = event.unified_msg_origin
+        umo = get_real_umo(event)
         uid = event.get_sender_id()
 
         # pass
