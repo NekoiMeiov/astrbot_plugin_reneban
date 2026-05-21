@@ -15,7 +15,7 @@ from .user_manager import (
     ModelListRegistry,
     MODEL_LIST_REGISTRY,
 )
-from .event_utils import EventUtils
+from .event_utils import EventUtils, get_real_umo
 from .exceptions import *
 
 
@@ -63,7 +63,7 @@ class ReNeBan(Star):
             )
         else:
             # 获取UMO
-            umo = event.unified_msg_origin
+            umo = get_real_umo(event)
             data: dict[str, dict[str, UserDataList] | BaseModelList] = (
                 self.data_manager.get_data()
             )
@@ -253,8 +253,7 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("ban"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            umo = get_real_umo(event)
         reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
@@ -407,8 +406,7 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("pass"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            umo = get_real_umo(event)
         reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
@@ -560,8 +558,7 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("dec-pass"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            umo = get_real_umo(event)
         reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
@@ -690,8 +687,7 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("dec-ban"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            umo = get_real_umo(event)
         reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
