@@ -1,5 +1,6 @@
 from astrbot.api.event import AstrMessageEvent
 import astrbot.api.message_components as Comp
+from astrbot.api.star import Context
 from .user_manager import (
     UserDataModel,
     UserDataList,
@@ -10,17 +11,6 @@ from .user_manager import (
 )
 from .datafile_manager import DatafileManager
 from .exceptions import AtUserCountError
-
-
-def get_real_umo(event: AstrMessageEvent) -> str:
-    """
-    获取真实的会话 UMO，绕过隔离会话（unique_session）对 session_id 的改写。
-    使用 message_obj.session_id，该值由平台适配器设置，不受 unique_session 影响。
-    """
-    original_session_id = event.message_obj.session_id
-    platform_id = event.get_platform_id()
-    msg_type = event.get_message_type().value
-    return f"{platform_id}:{msg_type}:{original_session_id}"
 
 
 class EventUtils:
@@ -49,7 +39,7 @@ class EventUtils:
         return at_users[0] if at_users else None
 
     @staticmethod
-    def is_banned(enable: bool, data_manager: DatafileManager, event: AstrMessageEvent):
+    def is_banned(enable: bool, data_manager: DatafileManager, context: Context, event: AstrMessageEvent):
         """
         判断用户是否被禁用，以及其理由
         """
@@ -68,7 +58,7 @@ class EventUtils:
             )
 
         # 获取UMO与UID
-        umo = get_real_umo(event)
+        umo = EventUtils.get_event_umo(context, event)
         uid = event.get_sender_id()
 
         # pass
@@ -100,3 +90,15 @@ class EventUtils:
         if banumo_data:
             return (True, banumo_data.reason)
         return (False, None)
+
+    @staticmethod
+    def get_event_umo(context: Context, event: AstrMessageEvent):
+        """
+        获取 umo 信息 （当 unique_session 为 True 时，仍返回 platform_id:message_type:group_id 以便处理）
+        """
+        if (
+            context.get_config()["platform_settings"]["unique_session"]
+            and event.get_group_id()
+        ):
+            return f"{event.session.platform_id}:{event.session.message_type.value}:{event.get_group_id()}"
+        return event.unified_msg_origin
