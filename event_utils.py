@@ -39,7 +39,12 @@ class EventUtils:
         return at_users[0] if at_users else None
 
     @staticmethod
-    def is_banned(enable: bool, data_manager: DatafileManager, context: Context, event: AstrMessageEvent):
+    def is_banned(
+        enable: bool,
+        data_manager: DatafileManager,
+        context: Context,
+        event: AstrMessageEvent,
+    ) -> tuple[bool, str | None]:
         """
         判断用户是否被禁用，以及其理由
         """
@@ -92,7 +97,7 @@ class EventUtils:
         return (False, None)
 
     @staticmethod
-    def get_event_umo(context: Context, event: AstrMessageEvent):
+    def get_event_umo(context: Context, event: AstrMessageEvent) -> str:
         """
         获取 umo 信息 （当 unique_session 为 True 时，仍返回 platform_id:message_type:group_id 以便处理）
         """
