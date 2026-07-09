@@ -1,5 +1,6 @@
 from astrbot.api.event import AstrMessageEvent
 import astrbot.api.message_components as Comp
+from astrbot.api.star import Context
 from .user_manager import (
     UserDataModel,
     UserDataList,
@@ -38,7 +39,7 @@ class EventUtils:
         return at_users[0] if at_users else None
 
     @staticmethod
-    def is_banned(enable: bool, data_manager: DatafileManager, event: AstrMessageEvent):
+    def is_banned(enable: bool, data_manager: DatafileManager, context: Context, event: AstrMessageEvent):
         """
         判断用户是否被禁用，以及其理由
         """
@@ -57,7 +58,7 @@ class EventUtils:
             )
 
         # 获取UMO与UID
-        umo = event.unified_msg_origin
+        umo = EventUtils.get_event_umo(context, event)
         uid = event.get_sender_id()
 
         # pass
@@ -89,3 +90,15 @@ class EventUtils:
         if banumo_data:
             return (True, banumo_data.reason)
         return (False, None)
+
+    @staticmethod
+    def get_event_umo(context: Context, event: AstrMessageEvent):
+        """
+        获取 umo 信息 （当 unique_session 为 True 时，仍返回 platform_id:message_type:group_id 以便处理）
+        """
+        if (
+            context.get_config()["platform_settings"]["unique_session"]
+            and event.get_group_id()
+        ):
+            return f"{event.session.platform_id}:{event.session.message_type.value}:{event.get_group_id()}"
+        return event.unified_msg_origin

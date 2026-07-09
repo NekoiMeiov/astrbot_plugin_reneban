@@ -63,7 +63,7 @@ class ReNeBan(Star):
             )
         else:
             # 获取UMO
-            umo = event.unified_msg_origin
+            umo = EventUtils.get_event_umo(self.context, event)
             data: dict[str, dict[str, UserDataList] | BaseModelList] = (
                 self.data_manager.get_data()
             )
@@ -208,7 +208,7 @@ class ReNeBan(Star):
         self.enable = True
         yield event.plain_result(strings.messages["ban_enabled"])
         logger.warning(
-            f"已临时启用禁用功能(in {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
+            f"已临时启用禁用功能(in {EventUtils.get_event_umo(self.context, event)} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -220,7 +220,7 @@ class ReNeBan(Star):
         self.enable = False
         yield event.plain_result(strings.messages["ban_disabled"])
         logger.warning(
-            f"已临时禁用禁用功能(in {event.unified_msg_origin} - {event.get_sender_name()}({event.get_sender_id()}))"
+            f"已临时禁用禁用功能(in {EventUtils.get_event_umo(self.context, event)} - {event.get_sender_name()}({event.get_sender_id()}))"
         )
 
     @filter.command("ban-help")
@@ -253,8 +253,8 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("ban"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            # 若umo不存在，则使用EventUtils.get_event_umo(self.context, event)（当前群）
+            umo = EventUtils.get_event_umo(self.context, event)
         reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
@@ -407,8 +407,8 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("pass"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            # 若umo不存在，则使用EventUtils.get_event_umo(self.context, event)（当前群）
+            umo = EventUtils.get_event_umo(self.context, event)
         reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
@@ -560,8 +560,8 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("dec-pass"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            # 若umo不存在，则使用EventUtils.get_event_umo(self.context, event)（当前群）
+            umo = EventUtils.get_event_umo(self.context, event)
         reason = strings.noreason_to_none(reason)
         try:
             pass_uid: str
@@ -690,8 +690,8 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("dec-ban"))
             return
         if umo == None:
-            # 若umo不存在，则使用event.unified_msg_origin（当前群）
-            umo = event.unified_msg_origin
+            # 若umo不存在，则使用EventUtils.get_event_umo(self.context, event)（当前群）
+            umo = EventUtils.get_event_umo(self.context, event)
         reason = strings.noreason_to_none(reason)
         try:
             ban_uid: str
@@ -845,7 +845,7 @@ class ReNeBan(Star):
         全局事件过滤器：
         如果禁用功能启用且发送者被禁用，则停止事件传播，机器人不再响应该用户的消息。
         """
-        if EventUtils.is_banned(self.enable, self.data_manager, event)[0]:
+        if EventUtils.is_banned(self.enable, self.data_manager, self.context, event)[0]:
             event.stop_event()
 
     async def terminate(self):
