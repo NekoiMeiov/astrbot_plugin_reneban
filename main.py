@@ -798,6 +798,233 @@ class ReNeBan(Star):
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("ban-umo")
+    async def ban_umo(
+        self,
+        event: AstrMessageEvent,
+        umo: str,
+        time: str = "0",
+        reason: str | None = None,
+        end: str | None = None,
+    ):
+        """
+        禁用指定UMO的使用权限。
+        格式：/ban-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
+        时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示无期限
+        示例：/ban-umo napcat:GroupMessage:1145141919 7d
+        注意：单次仅能禁用一个UMO
+        """
+        if end is not None:
+            # 若end存在，说明语法错误，发送错误信息并return
+            yield event.plain_result(strings.command_error("ban-umo"))
+            return
+        reason = strings.noreason_to_none(reason)
+        umoban_list: UmoDataList = self.data_manager.get_data("umoban")
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not umoban_list.add_time_to_data(
+                umo,
+                update_time,
+                reason,
+            ):
+                new_ban_item = UmoDataModel(
+                    umo=umo,
+                    time=(
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
+                    ),
+                    reason=reason,
+                )
+                umoban_list.append(new_ban_item)
+            self.data_manager.write_data("umoban", umoban_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(
+                strings.messages["time_zeroset_error"].format(command="ban-umo")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
+                )
+            )
+            return
+
+        yield event.plain_result(
+            strings.messages["banned_umo"].format(
+                umo=umo,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("pass-umo")
+    async def pass_umo(
+        self,
+        event: AstrMessageEvent,
+        umo: str,
+        time: str = "0",
+        reason: str | None = None,
+        end: str | None = None,
+    ):
+        """
+        解限指定UMO的使用权限。
+        格式：/pass-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
+        时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示无期限
+        示例：/pass-umo napcat:GroupMessage:1145141919 7d
+        """
+        if end is not None:
+            # 若end存在，说明语法错误，发送错误信息并return
+            yield event.plain_result(strings.command_error("pass-umo"))
+            return
+        reason = strings.noreason_to_none(reason)
+        umopass_list: UmoDataList = self.data_manager.get_data("umopass")
+        try:
+            update_time: int = time_utils.timestr_to_int(time)
+            if not umopass_list.add_time_to_data(
+                umo,
+                update_time,
+                reason,
+            ):
+                new_pass_item = UmoDataModel(
+                    umo=umo,
+                    time=(
+                        (int(time_module.time()) + update_time)
+                        if update_time != 0
+                        else 0
+                    ),
+                    reason=reason,
+                )
+                umopass_list.append(new_pass_item)
+            self.data_manager.write_data("umopass", umopass_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(
+                strings.messages["time_zeroset_error"].format(command="pass-umo")
+            )
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
+                )
+            )
+            return
+
+        yield event.plain_result(
+            strings.messages["passed_umo"].format(
+                umo=umo,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("dec-ban-umo")
+    async def dec_ban_umo(
+        self,
+        event: AstrMessageEvent,
+        umo: str,
+        time: str = "0",
+        reason: str | None = None,
+        end: str | None = None,
+    ):
+        """
+        删除指定UMO的封禁时间。
+        格式：/dec-ban-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
+        时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示彻底删除封禁记录
+        示例：/dec-ban-umo napcat:GroupMessage:1145141919 7d
+        注意：单次仅能操作一个UMO
+        """
+        if end is not None:
+            # 若end存在，说明语法错误，发送错误信息并return
+            yield event.plain_result(strings.command_error("dec-ban-umo"))
+            return
+        reason = strings.noreason_to_none(reason)
+        umoban_list: UmoDataList = self.data_manager.get_data("umoban")
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not umoban_list.subtract_time_from_data(
+                umo,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("umoban", umoban_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
+                )
+            )
+            return
+
+        yield event.plain_result(
+            strings.messages["dec_banned_umo"].format(
+                umo=umo,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("dec-pass-umo")
+    async def dec_pass_umo(
+        self,
+        event: AstrMessageEvent,
+        umo: str,
+        time: str = "0",
+        reason: str | None = None,
+        end: str | None = None,
+    ):
+        """
+        删除指定UMO的解限时间。
+        格式：/dec-pass-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
+        时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示彻底删除解限记录
+        示例：/dec-pass-umo napcat:GroupMessage:1145141919 7d
+        注意：单次仅能操作一个UMO
+        """
+        if end is not None:
+            # 若end存在，说明语法错误，发送错误信息并return
+            yield event.plain_result(strings.command_error("dec-pass-umo"))
+            return
+        reason = strings.noreason_to_none(reason)
+        umopass_list: UmoDataList = self.data_manager.get_data("umopass")
+        try:
+            remove_time: int = time_utils.timestr_to_int(time)
+            if not umopass_list.subtract_time_from_data(
+                umo,
+                remove_time,
+                reason,
+            ):
+                yield event.plain_result(strings.messages["dec_no_record"])
+                return
+            self.data_manager.write_data("umopass", umopass_list)
+        except PermanentRecordTimeError:
+            yield event.plain_result(strings.messages["dec_zerotime_error"])
+            return
+        except TimestrValueError as e:
+            yield event.plain_result(
+                strings.messages["invalid_timestr_error"].format(
+                    timestr=e.invalid_timestr
+                )
+            )
+            return
+
+        yield event.plain_result(
+            strings.messages["dec_passed_umo"].format(
+                umo=umo,
+                time=time_utils.time_format(time),
+                reason=strings.reason_format(reason),
+            )
+        )
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("ban-reset")
     async def ban_reset(
         self, event: AstrMessageEvent, resetuser: str, end: str | None = None
@@ -823,7 +1050,7 @@ class ReNeBan(Star):
             yield event.plain_result(strings.command_error("ban-reset"))
             return
 
-        user_datas: dict[str, dict[str, UserDataList] | BaseModelList] = (
+        user_datas: dict[str, dict[str, UserDataList] | UserDataList] = (
             self.data_manager.get_data(["ban", "pass", "banall", "passall"])
         )
         for umo in list(user_datas["ban"].keys()):
@@ -836,6 +1063,33 @@ class ReNeBan(Star):
 
         yield event.plain_result(
             strings.messages["ban_reset_success"].format(user=reset_uid)
+        )
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("ban-reset-umo")
+    async def ban_reset_umo(
+        self, event: AstrMessageEvent, umo: str, end: str | None = None
+    ):
+        """
+        删除一名指定UMO的所有记录
+        格式：/ban-reset-umo <UMO>
+        示例：/ban-reset-umo napcat:GroupMessage:1145141919
+        注意：单次仅能操作一个UMO
+        """
+        if end is not None:
+            # 若end存在，说明语法错误，发送错误信息并return
+            yield event.plain_result(strings.command_error("ban-reset-umo"))
+            return
+
+        umo_datas: dict[str, UmoDataList] = self.data_manager.get_data(
+            ["umoban", "umopass"]
+        )
+        umo_datas["umoban"].remove_by_id(umo)
+        umo_datas["umopass"].remove_by_id(umo)
+        self.data_manager.write_data(list(umo_datas.keys()), list(umo_datas.values()))
+
+        yield event.plain_result(
+            strings.messages["ban_reset_umo_success"].format(umo=umo)
         )
 
     # 设置优先级，可在其他低优先级（priority<114）的命令/监听器/钩子前过滤
