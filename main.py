@@ -811,7 +811,7 @@ class ReNeBan(Star):
         禁用指定UMO的使用权限。
         格式：/ban-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
         时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示无期限
-        示例：/ban-umo napcat:GroupMassage:1145141919 7d
+        示例：/ban-umo napcat:GroupMessage:1145141919 7d
         注意：单次仅能禁用一个UMO
         """
         if end is not None:
@@ -873,7 +873,7 @@ class ReNeBan(Star):
         解限指定UMO的使用权限。
         格式：/pass-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
         时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示无期限
-        示例：/pass-umo napcat:GroupMassage:1145141919 7d
+        示例：/pass-umo napcat:GroupMessage:1145141919 7d
         """
         if end is not None:
             # 若end存在，说明语法错误，发送错误信息并return
@@ -934,7 +934,7 @@ class ReNeBan(Star):
         删除指定UMO的封禁时间。
         格式：/dec-ban-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
         时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示彻底删除封禁记录
-        示例：/dec-ban-umo napcat:GroupMassage:1145141919 7d
+        示例：/dec-ban-umo napcat:GroupMessage:1145141919 7d
         注意：单次仅能操作一个UMO
         """
         if end is not None:
@@ -986,7 +986,7 @@ class ReNeBan(Star):
         删除指定UMO的解限时间。
         格式：/dec-pass-umo <UMO> [时间（默认无期限）] [理由（默认无理由）]
         时间格式：数字+单位（d=天，h=小时，m=分钟，s=秒），如 1d 表示1天，12h 表示12个小时，不带单位默认秒，0表示彻底删除解限记录
-        示例：/dec-pass-umo napcat:GroupMassage:1145141919 7d
+        示例：/dec-pass-umo napcat:GroupMessage:1145141919 7d
         注意：单次仅能操作一个UMO
         """
         if end is not None:
@@ -1073,7 +1073,7 @@ class ReNeBan(Star):
         """
         删除一名指定UMO的所有记录
         格式：/ban-reset-umo <UMO>
-        示例：/ban-reset-umo napcat:GroupMassage:1145141919
+        示例：/ban-reset-umo napcat:GroupMessage:1145141919
         注意：单次仅能操作一个UMO
         """
         if end is not None:
