@@ -34,7 +34,7 @@ ReNeBan 的指令优先级策略为：`局部优先`，`pass > ban`。
 | `/dec-pass-all` | /dec-pass-all <@用户\|UID（QQ号）> [时间（默认无期限）] [理由（默认无理由）] | 删除在**全局**范围内对**一名指定用户**的解禁时长 | /dec-pass-all @XYZ 0 NULL |
 | `/ban-reset` | /ban-reset <@用户\|UID（QQ号）> | 删除**一名指定用户**的**所有**记录 | /ban-reset @NekoiMeiov |
 | `/ban-umo` | /ban-umo \<UMO\> [时间（默认无期限）] [理由（默认无理由）] | 禁用**一个指定会话** | /ban-umo napcat:GroupMessage:1145141919 3d |
-| `/pass-umo` | /pass-umo \<UMO\> [时间（默认无期限）] [理由（默认无理由）] | **解除禁用**一个指定会话** | /pass-umo napcat:GroupMessage:1145141919 12h |
+| `/pass-umo` | /pass-umo \<UMO\> [时间（默认无期限）] [理由（默认无理由）] | 解除禁用**一个指定会话** | /pass-umo napcat:GroupMessage:1145141919 12h |
 | `/dec-ban-umo` | /dec-ban-umo \<UMO\> [时间（默认无期限）] [理由（默认无理由）] | 删除对**一个指定会话**的禁用时长 | /dec-ban-umo napcat:GroupMessage:1145141919 1d12h |
 | `/dec-pass-umo` | /dec-pass-umo \<UMO\> [时间（默认无期限）] [理由（默认无理由）] | 删除**一个指定会话**的解禁时长 | /dec-pass-umo napcat:GroupMessage:1145141919 3h NULL |
 | `/ban-reset-umo` | /ban-reset-umo \<UMO\> | 删除**一个指定会话**的**所有**记录 | /ban-reset-umo napcat:GroupMessage:1145141919 |
