@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReNeBan 黑名单管理面板</title>
+    <link rel="stylesheet" href="./style.css" />
+    <!-- AstrBot 会把该路径重写为带 asset_token 的 bridge SDK 地址 -->
+    <script src="/api/plugin/page/bridge-sdk.js"></script>
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <!-- 首次加载骨架屏 -->
+    <div id="boot" class="boot">
+      <div class="boot__logo" data-icon="shield" aria-hidden="true"></div>
+      <p class="boot__text" id="bootText">正在读取黑名单数据…</p>
+      <div class="boot__bar"><span></span></div>
+    </div>
+
+    <!-- 致命错误 -->
+    <div id="fatal" class="fatal" hidden>
+      <div class="fatal__card">
+        <div class="fatal__icon" data-icon="alert" aria-hidden="true"></div>
+        <h2 class="fatal__title" id="fatalTitle">读取数据失败</h2>
+        <p class="fatal__msg" id="fatalMsg"></p>
+        <button class="btn btn--primary" id="fatalRetry" type="button">重试</button>
+      </div>
+    </div>
+
+    <div id="app" class="app" hidden>
+      <!-- 顶栏 -->
+      <header class="topbar" id="topbar">
+        <div class="topbar__brand">
+          <span class="topbar__mark" data-icon="shield" aria-hidden="true"></span>
+          <div class="topbar__titles">
+            <p class="topbar__eyebrow" id="eyebrow">ReNeBan</p>
+            <h1 class="topbar__title" id="heading">黑名单管理面板</h1>
+          </div>
+        </div>
+
+        <div class="topbar__actions">
+          <button
+            class="switch switch--pill"
+            id="enableSwitch"
+            type="button"
+            role="switch"
+            aria-checked="false"
+          >
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+            <span class="switch__label" id="enableLabel"></span>
+          </button>
+          <!-- The icon lives on an inner span: hydrateIcons() replaces the
+               innerHTML of the [data-icon] node, so it must not own the label. -->
+          <button class="btn btn--ghost btn--icon" id="refreshBtn" type="button">
+            <span data-icon="refresh" aria-hidden="true"></span>
+            <span class="sr-only" id="refreshLabel">刷新</span>
+          </button>
+          <button class="btn btn--primary" id="createBtn" type="button">
+            <span data-icon="plus"></span>
+            <span id="createLabel">新增记录</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="main">
+        <!-- 指标带 -->
+        <section class="stats" id="stats" aria-label="统计"></section>
+
+        <!-- Bento：图表 + 洞察 -->
+        <section class="bento stagger" id="bento" hidden>
+          <div class="bento__col">
+            <div class="panel">
+              <div class="panel__head">
+                <h2 class="panel__title">
+                  <span data-icon="heat"></span><span id="heatTitle"></span>
+                </h2>
+                <span class="panel__hint" id="heatHint"></span>
+              </div>
+              <div class="panel__body">
+                <div class="heat-wrap">
+                  <div class="heat" id="heat" role="img" aria-label="到期热力分布"></div>
+                  <div class="heat-axis" id="heatAxis" aria-hidden="true"></div>
+                  <div class="heat-legend" id="heatLegend"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel__head">
+                <h2 class="panel__title">
+                  <span data-icon="timer"></span><span id="histTitle"></span>
+                </h2>
+                <span class="panel__hint" id="histHint"></span>
+              </div>
+              <div class="panel__body">
+                <div class="chart-histogram" id="histogram"></div>
+                <div class="chart-legend" id="histLegend"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel__head">
+                <h2 class="panel__title">
+                  <span data-icon="timer"></span><span id="timelineTitle"></span>
+                </h2>
+                <span class="panel__hint" id="timelineHint"></span>
+              </div>
+              <div class="panel__body" id="timeline"></div>
+            </div>
+          </div>
+
+          <div class="bento__col">
+            <div class="panel">
+              <div class="panel__head">
+                <h2 class="panel__title">
+                  <span data-icon="pie"></span><span id="mixTitle"></span>
+                </h2>
+                <span class="panel__hint" id="mixHint"></span>
+              </div>
+              <div class="panel__body" id="mixBody"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel__head">
+                <h2 class="panel__title">
+                  <span data-icon="spark"></span><span id="insightTitle"></span>
+                </h2>
+              </div>
+              <div class="insights" id="insights"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 工具栏 -->
+        <section class="toolbar">
+          <div class="search">
+            <span data-icon="search" aria-hidden="true"></span>
+            <input
+              id="searchInput"
+              type="search"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="搜索用户 ID、会话或理由"
+              aria-label="搜索"
+            />
+            <kbd>/</kbd>
+          </div>
+
+          <div class="selects" id="selects"></div>
+
+          <div class="viewtoggle">
+            <div class="segmented" role="group" aria-label="视图切换">
+              <button class="segmented__btn is-active" data-layout="table" type="button">
+                <span data-icon="rows"></span><span id="layoutTableLabel">表格</span>
+              </button>
+              <button class="segmented__btn" data-layout="cards" type="button">
+                <span data-icon="grid"></span><span id="layoutCardsLabel">卡片</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 标签页 -->
+        <nav class="tabs" id="tabs" role="tablist" aria-label="记录分类"></nav>
+
+        <!-- 内容 -->
+        <section class="content" id="content" role="tabpanel"></section>
+      </main>
+
+      <footer class="footer">
+        <span id="footerHint">快捷键：R 刷新 · / 搜索 · Esc 关闭弹窗</span>
+        <span class="footer__meta" id="footerMeta"></span>
+      </footer>
+    </div>
+
+    <!-- 弹窗 -->
+    <div class="modal" id="modal" hidden>
+      <div class="modal__backdrop" data-close="1"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="modalTitle"></h2>
+          <button class="iconbtn" id="modalClose" type="button" aria-label="关闭" data-icon="close"></button>
+        </header>
+        <div class="modal__body" id="modalBody"></div>
+        <footer class="modal__foot" id="modalFoot"></footer>
+      </div>
+    </div>
+
+    <!-- 轻提示 -->
+    <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+  </body>
+</html>

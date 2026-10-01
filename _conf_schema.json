@@ -2,11 +2,13 @@
     "enable": {
         "description": "是否启用禁用功能",
         "type": "bool",
-        "default": true
+        "default": true,
+        "hint": "关闭后黑名单立即失效，但记录会保留；等同于 /ban-disable"
     },
     "cache_ttl": {
         "description": "缓存存活时间（秒）",
         "type": "int",
-        "default": 60
+        "default": 60,
+        "hint": "记录文件的缓存时长，越小越省内存、越大越少读盘；修改后需重启插件生效"
     }
 }

@@ -17,6 +17,7 @@ from .user_manager import (
 )
 from .event_utils import EventUtils
 from .exceptions import *
+from .page_api import PAGE_NAME, PLUGIN_NAME, PageApi
 
 
 class ReNeBan(Star):
@@ -30,6 +31,35 @@ class ReNeBan(Star):
         # 初始化数据文件管理器
         self.data_manager = DatafileManager(
             StarTools.get_data_dir(), cache_ttl=cache_ttl
+        )
+        # 注册 Dashboard Page 所使用的 Web API
+        self.page_api = PageApi(self)
+        self._register_page_apis()
+
+    def _register_page_apis(self):
+        """注册 Dashboard Page 依赖的插件 Web API"""
+        api = self.page_api
+        routes = (
+            ("overview", api.overview, ["GET"], "ReNeBan Page: 读取黑名单总览"),
+            ("toggle", api.toggle, ["POST"], "ReNeBan Page: 切换禁用功能"),
+            ("ban", api.ban, ["POST"], "ReNeBan Page: 新增或叠加禁用记录"),
+            ("pass", api.grant_pass, ["POST"], "ReNeBan Page: 新增或叠加解限记录"),
+            ("shift", api.shift_time, ["POST"], "ReNeBan Page: 增删记录时长"),
+            ("delete", api.delete, ["POST"], "ReNeBan Page: 删除单条记录"),
+            ("reset-user", api.reset_user, ["POST"], "ReNeBan Page: 清除用户记录"),
+            (
+                "reset-session",
+                api.reset_session,
+                ["POST"],
+                "ReNeBan Page: 清除会话记录",
+            ),
+        )
+        for name, handler, methods, desc in routes:
+            self.context.register_web_api(
+                f"/{PLUGIN_NAME}/{name}", handler, methods, desc
+            )
+        logger.info(
+            f"ReNeBan: 已注册 Dashboard Page 接口，页面路径 pages/{PAGE_NAME}/index.html"
         )
 
     @filter.command("banlist")
